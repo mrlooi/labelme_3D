@@ -42,26 +42,78 @@ std::vector<cv::Point> img_pts;
 
 Eigen::Matrix4f viewer_pose;
 
-std::vector<pcl::PointCloud<PointT>::Ptr> undo_clouds;
-std::vector<pcl::PointCloud<PointT>::Ptr> redo_clouds;
+std::vector<int> current_indices;
 
-void run_undo_redo(std::vector<pcl::PointCloud<PointT>::Ptr>& stack1, std::vector<pcl::PointCloud<PointT>::Ptr>& stack2)
+struct OpData {
+	pcl::PointCloud<PointT>::Ptr cloud;
+	std::vector<int> parent_indices;
+};
+
+std::vector<OpData> undo_data;
+std::vector<OpData> redo_data;
+
+
+inline void extractParentIndices(std::vector<int>& indices, const std::vector<int>& parent_indices, const std::vector<int>& child_indices)
+{
+    assert(child_indices.size() <= parent_indices.size());
+    indices.clear();
+    indices.reserve(child_indices.size());
+    for (size_t i = 0; i < child_indices.size(); ++i)
+    {
+        indices.push_back(parent_indices[child_indices[i]]);
+    }
+}
+
+template <typename T>
+inline void set_diff(std::vector<T>& result, const std::vector<T>& first, const std::vector<T>& second, bool sorted=true)
+{
+    if (!sorted)
+    {
+        auto sorted_first = first;
+        auto sorted_second = second;
+        std::sort(sorted_first.begin(), sorted_first.end());
+        std::sort(sorted_second.begin(), sorted_second.end());
+        std::set_difference(sorted_first.begin(),sorted_first.end(),sorted_second.begin(),sorted_second.end(),std::inserter(result, result.end()));
+    } else {
+        std::set_difference(first.begin(),first.end(),second.begin(),second.end(),std::inserter(result, result.end()));
+    }
+}
+
+inline void get_outliers(std::vector<int>& outliers, const std::vector<int>& inliers, const int cloud_sz)
+{
+	std::vector<int> all_indices(cloud_sz);
+	for (int i = 0; i < cloud_sz; ++i)
+	{
+		all_indices[i] = i;
+	}
+	std::vector<int> sorted_inliers = inliers;
+	std::sort(sorted_inliers.begin(), sorted_inliers.end());
+	set_diff(outliers, all_indices, sorted_inliers);
+}
+
+void run_undo_redo(std::vector<OpData>& stack1, std::vector<OpData>& stack2)
 {
 	if (stack1.size() == 0)
 		return;
 	pcl::PointCloud<PointT>::Ptr cur_cloud (new pcl::PointCloud<PointT>);
 	*cur_cloud += *cloud;
-	stack2.push_back(cur_cloud);
-	cloud = stack1.back();	
+	OpData d2;
+	d2.cloud = cur_cloud;
+	d2.parent_indices = current_indices;
+	stack2.push_back(d2);
+
+	const OpData& d = stack1.back();	
+	cloud = d.cloud;
+	current_indices = d.parent_indices;
 	stack1.pop_back();
 }
 void undo()
 {
-	run_undo_redo(undo_clouds, redo_clouds);
+	run_undo_redo(undo_data, redo_data);
 }
 void redo()
 {
-	run_undo_redo(redo_clouds, undo_clouds);
+	run_undo_redo(redo_data, undo_data);
 }
 
 
@@ -274,12 +326,26 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
   if (event.keyDown())
   {
 	bool is_ctrl = event.isCtrlPressed();
-	if (key == "a" || key == "d" || key == "x")
+	if (key == "a" || key == "u" || key == "d" || key == "x")
 	{
 		get_viewer_pose(viewer, viewer_pose);
 		if (key == "a")
 		{
 			printf("Operation: EDIT\n");
+		} else if (key == "u")
+		{
+			printf("Operation: ORIGINAL COLOR\n");
+			if (undo_data.size() == 0)
+			{
+				printf("No previous clouds to extract original color!\n");
+				return;	
+			}
+			// else if (undo_data.back()->size() != cloud->size())
+			// {	
+			// 	printf("Previous cloud and current cloud points have changed, cannot get original color!\n");
+			// 	return;	
+			// }
+
 		} else if (key == "d")
 		{
 			printf("Operation: DELETE\n");
@@ -299,8 +365,11 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		// add current cloud to undo stack
 		pcl::PointCloud<PointT>::Ptr cur_cloud (new pcl::PointCloud<PointT>);
 		*cur_cloud += *cloud;
-		undo_clouds.push_back(cur_cloud);
-		redo_clouds.clear();
+		OpData op_data;
+		op_data.cloud = cur_cloud;
+		op_data.parent_indices = current_indices;
+		undo_data.push_back(op_data);
+		redo_data.clear();
 
 		if (key == "a")
 		{
@@ -310,10 +379,26 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			auto& pts = cloud->points;
 			if (key == "d")
 			{
+				std::vector<int> remain_indices;
+				get_outliers(remain_indices, cloud_indices, cloud->size());
+				std::vector<int> child_indices;
+				extractParentIndices(child_indices, current_indices, remain_indices);
+				current_indices = child_indices;
 				cloud = extract_cloud(cloud, cloud_indices, true);
 			} else if (key == "x")
 			{
+				std::vector<int> child_indices;
+				extractParentIndices(child_indices, current_indices, cloud_indices);
+				current_indices = child_indices;
 				cloud = extract_cloud(cloud, cloud_indices, false);
+			} else if (key == "u")
+			{
+				for (int i = 0; i < cloud_indices.size(); ++i)
+				{
+					int ix = cloud_indices[i];
+					int parent_ix = current_indices[ix];
+					cloud->points[ix] = raw_cloud->points[parent_ix];
+				}
 			}
 			// std::sort(cloud_indices.begin(), cloud_indices.end()); // sort so that erase can be ordered
 			// for (int i = 0; i < cloud_indices.size(); ++i)
@@ -325,28 +410,31 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		img_pts.clear();
 
 		refresh_cloud = true;
-	}
-	else if (key == "s")
+	} 
+	if (is_ctrl)
 	{
-		if (save_file.size() > 0)
+		if (key == "s")
 		{
-			pcl::io::savePCDFileBinary(save_file, *cloud);
-			printf("Saved to %s\n", save_file.c_str());
-		} else {
-			printf("Please pass a valid file to save_file [-s] argument\n");
+			if (save_file.size() > 0)
+			{
+				pcl::io::savePCDFileBinary(save_file, *cloud);
+				printf("Saved to %s\n", save_file.c_str());
+			} else {
+				printf("Please pass a valid file to save_file [-s] argument\n");
+			}
 		}
-	}
-	else if (key == "z" && is_ctrl)
-	{
-		printf("Ctrl+z PRESSED\n");		
-		undo();
-		refresh_cloud = true;
-	}
-	else if (key == "y" && is_ctrl)
-	{
-		printf("Ctrl+y PRESSED\n");		
-		redo();
-		refresh_cloud = true;
+		else if (key == "z")
+		{
+			printf("Ctrl+z PRESSED\n");		
+			undo();
+			refresh_cloud = true;
+		}
+		else if (key == "y")
+		{
+			printf("Ctrl+y PRESSED\n");		
+			redo();
+			refresh_cloud = true;
+		}
 	}
 
 	if (refresh_cloud)
@@ -392,7 +480,13 @@ int main(int argc, char *argv[])
   pcl::console::parse (argc, argv, "-focal", focal);
   pcl::console::parse (argc, argv, "-s", save_file);
 
-  cloud = raw_cloud;
+  *cloud += *raw_cloud;
+
+  current_indices.resize(raw_cloud->size());
+  for (int i = 0; i < current_indices.size(); ++i)
+  {
+  	current_indices[i] = i;
+  }
 
   pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer);
   viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);

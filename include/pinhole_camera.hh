@@ -213,6 +213,16 @@ public:
 		pcl::transformPointCloud(*cloud_, *rot_cloud, camera_pose_);
 
 		const int N = cloud_->size();
+		// store a cache of the distance of all the points to origin
+		std::vector<float> pts_distance_cache(N);
+		for (int i = 0; i < N; ++i)
+		{
+			pts_distance_cache[i] = get_pt_distance(rot_cloud->points[i]);
+		}
+
+		// Store a cache (as Matrix) of the minimum point distance for each pixel point
+		Eigen::MatrixXf uv_min_distance_cache = Eigen::MatrixXf::Constant(image_height_, image_width_, -1); 
+
 		for (int i = 0; i < N; ++i)
 		{
 			// std::cout << S(0, i) << std::endl;
@@ -227,10 +237,18 @@ public:
 			{
 				uv_idx_map[y][x].push_back(i);
 
-				auto& px = proj_img.at<cv::Vec3b>(y,x);
-				px[0] = pt.b;
-				px[1] = pt.g;
-				px[2] = pt.r;
+				float pt_dist = pts_distance_cache[i];
+				float min_cache_dist = uv_min_distance_cache(y,x);
+
+				if (pt_dist < min_cache_dist || min_cache_dist == -1)
+				{
+					auto& px = proj_img.at<cv::Vec3b>(y,x);
+					px[0] = pt.b;
+					px[1] = pt.g;
+					px[2] = pt.r;
+
+					uv_min_distance_cache(y,x) = pt_dist;
+				}
 			}
 		}
 	}
