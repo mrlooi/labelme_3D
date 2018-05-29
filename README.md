@@ -5,13 +5,6 @@ Labelling pointclouds is now as simple as opening up PCL viewer and pressing som
 
 Annotate, delete, and extract points in a cloud by drawing polygons (to form a mask around the desired points)
 
-## Requirements
-- PCL
-- OpenCV
-
-## Usage
-./labelme_3d pcd_file [-s output_file] 
-
 ## About
 This tool is comprised of 2 components:
 - PCL Viewer
@@ -38,6 +31,13 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Undo previous polygon point: `backspace`
 - Clear: `c` (clears all existing polygon points)
 - Quit: `q`  (closes the pop-up window (but not the PCL viewer))
+
+## Usage
+./labelme_3d pcd_file [-s output_file] 
+
+## Requirements
+- PCL
+- OpenCV
 
 ## How to build
 mkdir build  
