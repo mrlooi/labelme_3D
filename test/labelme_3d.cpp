@@ -574,12 +574,13 @@ void mouseEventOccurred(const pcl::visualization::MouseEvent &event, void* viewe
 
 int main(int argc, char *argv[])
 {
-  std::string pcd_file = "../data/3.pcd";
-
-  if (argc > 1)
+  std::string pcd_file;
+  if (argc <= 1)
   {
-	pcd_file = argv[1];
+  	printf("Usage: %s pcd_file\n", argv[0]);
+  	return -1;
   }
+  pcd_file = argv[1];
 
   if ( pcl::io::loadPCDFile <PointT> (pcd_file, *raw_cloud) == -1)
   {
