@@ -17,10 +17,11 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 
 ## Commands
 ### PCL Viewer
-- Annotate: `a` (annotate points in a polygon - currently assigns a random color to the points)
+- Annotate: `a` (annotate points in a polygon - currently assigns a random annotation color to the points)
+- Merge Annotation: `m` (annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action)
 - Undo-Annotation: `u`  (converts points in the polygon back to their original colors)
 - Delete: `d`   (removes all points in the polygon)
-- Extract: `x`  (this does the opposite of "delete" i.e. extracts the points in the mask only)
+- Extract: `x`  (extracts all points in the polygon -> opposite of "delete")
 - Undo: `Ctrl + z`
 - Redo: `Ctrl + y`
 - Save: `Ctrl + s`  (saves to output_file, must be set as an argument with '-s', see Usage)
