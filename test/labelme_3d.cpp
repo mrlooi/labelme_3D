@@ -31,7 +31,7 @@ int focal = 800;
 pcl::PointCloud<PointT>::Ptr raw_cloud (new pcl::PointCloud<PointT>);
 pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>);
 
-std::string save_file;
+std::string save_file = "./labelme_3d_out.pcd";
 
 // Eigen::MatrixXi uv_idx_map;
 std::vector<std::vector<std::vector<int>>> uv_idx_map;
@@ -42,7 +42,10 @@ std::vector<cv::Point> img_pts;
 
 Eigen::Matrix4f viewer_pose;
 
+Eigen::Vector3i anchor_color {-1,-1,-1};
 std::vector<int> current_indices;
+
+std::vector<Eigen::Vector3i> saved_colors;
 
 struct OpData {
 	pcl::PointCloud<PointT>::Ptr cloud;
@@ -52,6 +55,15 @@ struct OpData {
 std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
 
+
+
+void pt_to_rect(const cv::Point& pt, cv::Rect& rect, int width, int height)
+{
+	rect.x = pt.x - width / 2;
+	rect.y = pt.y - height / 2;
+	rect.width = width;
+	rect.height = height;
+}
 
 inline void extractParentIndices(std::vector<int>& indices, const std::vector<int>& parent_indices, const std::vector<int>& child_indices)
 {
@@ -183,7 +195,7 @@ static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewe
   // // viewer_pose(2,2) = -viewer_pose(2,2);  // z axis is flipped
 }
 
-void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+void PolygonCallbackFunc(int event, int x, int y, int flags, void* userdata)
 {
 	 if  ( event == cv::EVENT_LBUTTONDOWN )
 	 {
@@ -209,18 +221,71 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 	 cv::imshow("My Window", proj_img_copy);
 }
 
+void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
+{
+	if  ( event == cv::EVENT_LBUTTONDOWN )
+	{
+		// cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+
+		cv::Rect anchor_rect;
+		cv::Point anchor_pt {x,y};
+		pt_to_rect(anchor_pt, anchor_rect, 5, 5);
+
+		size_t total_colors = saved_colors.size();
+		std::vector<int> saved_colors_count(total_colors);
+		// printf("Anchor Rect: %d %d %d %d\n", anchor_rect.x, anchor_rect.y, anchor_rect.x + anchor_rect.width, anchor_rect.y + anchor_rect.height);
+		for (int x = anchor_rect.x; x < anchor_rect.x + anchor_rect.width; ++x)
+		{	
+	    	for (int y = anchor_rect.y; y < anchor_rect.y + anchor_rect.height; ++y)
+	    	{
+				const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
+		    	for (int c = 0; c < total_colors; ++c)
+		    	{
+		    		const auto& s_color = saved_colors[c];
+					if (px[0] == s_color[0] && px[1] == s_color[1] && px[2] == s_color[2])
+					{
+						saved_colors_count[c] += 1;
+						break;
+					}
+		    	}
+	    	}
+		}
+
+		// check if color matches a saved color
+		int max_cnt = 0;
+		int max_color_idx = 0;
+		for (int i = 0; i < total_colors; ++i)
+		{
+			int cnt = saved_colors_count[i];
+			if (cnt > max_cnt)
+			{
+				max_cnt = cnt;
+				max_color_idx = i;
+			}
+		}
+		if (max_cnt == 0)
+		{
+			printf("No matching color detected, please select a valid anchor point!\n");
+			return;
+		}
+
+		anchor_color = saved_colors[max_color_idx];
+
+		proj_img_copy = proj_img.clone();
+		float radius = 3;
+		cv::circle( proj_img_copy, {x,y}, radius, BLUE, 3, 8, 0 );
+	}
+}
 
 void trigger_cv_window()
 {
-  project();
-
   // cv::flip(proj_img, proj_img, -1); // rotate by 180
 
   //Create a window
   cv::namedWindow("My Window", 1);
 
   //set the callback function for any mouse event
-  cv::setMouseCallback("My Window", CallBackFunc, NULL);
+  cv::setMouseCallback("My Window", PolygonCallbackFunc, NULL);
 
   //show the image
   while (1)
@@ -262,6 +327,35 @@ void trigger_cv_window()
 
   cv::destroyWindow("My Window");
 }
+
+
+void trigger_cv_window_merge()
+{
+	//Create a window
+	cv::namedWindow("My Window", 1);
+
+	//set the callback function for any mouse event
+	cv::setMouseCallback("My Window", SinglePointCallbackFunc, NULL);
+	while (1)
+	{
+		cv::imshow("My Window", proj_img_copy);
+
+		char key = (char) cv::waitKey(10); 
+		if (key == 'q')
+		{
+		  cv::destroyWindow("My Window");
+		  return;
+		}
+		if (anchor_color[0] != -1 && anchor_color[1] != -1 && anchor_color[2] != -1)
+		{
+			proj_img = proj_img_copy;
+			break;
+		}
+	}
+
+	trigger_cv_window();
+}
+
 
 cv::Mat get_mask()
 {
@@ -325,10 +419,11 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
   bool refresh_cloud = false;
   if (event.keyDown())
   {
+	get_viewer_pose(viewer, viewer_pose);
+
 	bool is_ctrl = event.isCtrlPressed();
-	if (key == "a" || key == "u" || key == "d" || key == "x")
+	if (key == "a" || key == "u" || key == "d" || key == "x" || key == "m")
 	{
-		get_viewer_pose(viewer, viewer_pose);
 		if (key == "a")
 		{
 			printf("Operation: EDIT\n");
@@ -339,26 +434,40 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			{
 				printf("No previous clouds to extract original color!\n");
 				return;	
-			}
-			// else if (undo_data.back()->size() != cloud->size())
-			// {	
-			// 	printf("Previous cloud and current cloud points have changed, cannot get original color!\n");
-			// 	return;	
-			// }
-
+			} 
 		} else if (key == "d")
 		{
 			printf("Operation: DELETE\n");
-		} else 
+		} else if (key == "x")
 		{
 			printf("Operation: EXTRACT\n");
 		}
-		trigger_cv_window();
+
+    	project();
+
+    	Eigen::Vector3i color;
+		if (key == "m")
+		{
+			printf("Operation: Merge\n");
+			if (saved_colors.size() == 0)
+			{
+				printf("There are currently no valid annotation colors\n");	
+				return;
+			}
+			printf("Select an anchor point, then draw an extra polygon \n");
+	    	trigger_cv_window_merge();
+	    	color = anchor_color;
+	    	anchor_color = {-1,-1,-1}; // reset
+		} else {
+			trigger_cv_window();			
+		}
+
 		cv::Mat mask = get_mask();
 		std::vector<int> cloud_indices;
 		get_mask_3d_points(mask, cloud_indices);
 		if (cloud_indices.size() == 0)
 		{
+			img_pts.clear();
 			return;
 		}
 
@@ -371,9 +480,13 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		undo_data.push_back(op_data);
 		redo_data.clear();
 
-		if (key == "a")
+		if (key == "a" || key == "m")
 		{
-			auto color = PclViewerUtils::get_random_color();
+			if (key == "a")
+			{
+				color = PclViewerUtils::get_random_color();
+				saved_colors.push_back(color);
+			}
 			PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
 		} else {
 			auto& pts = cloud->points;
