@@ -671,6 +671,7 @@ int main(int argc, char *argv[])
   pcl::console::parse (argc, argv, "-height", img_height);
   pcl::console::parse (argc, argv, "-focal", focal);
   pcl::console::parse (argc, argv, "-s", out_pcd_file);
+  pcl::console::parse (argc, argv, "-j", out_json_file);
 
   *cloud += *raw_cloud;
 
