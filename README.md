@@ -39,7 +39,7 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Default out_json_file path: ./labelme_3d_out.json
 
 ## Reading output json file
-Read the output json file and display the annotated pointcloud. The file will also show the projected pointcloud onto a 2D image, though for this you'll need to manually set the 4x4 viewer pose in read_labelme_data.cpp  
+Read the output json file and display the annotated pointcloud (must set the original pcd file, since the json file references the original point cloud). The file will also show the projected pointcloud onto a 2D image, though for this you'll need to manually set the 4x4 viewer pose in read_labelme_data.cpp  
 `./read_labelme_data original_pcd_file out_json_file`  
 
 
