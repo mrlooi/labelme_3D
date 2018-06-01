@@ -450,9 +450,9 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		} else if (key == "u")
 		{
 			printf("Operation: UNDO ANNOTATION\n");
-			if (undo_data.size() == 0)
+			if (saved_colors.size() == 0)
 			{
-				printf("No previous clouds to extract original color!\n");
+				printf("There are currently no valid annotation colors\n");	
 				return;	
 			} 
 		} else if (key == "d")
@@ -473,13 +473,10 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 
     	project();
 
-    	Eigen::Vector3i color;
 		if (key == "m")
 		{
 			printf("Select an anchor point, then draw an extra polygon \n");
 	    	trigger_cv_window_merge();
-	    	color = anchor_color;
-	    	anchor_color = {-1,-1,-1}; // reset
 		} else {
 			trigger_cv_window();			
 		}
@@ -504,13 +501,18 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 
 		if (key == "a" || key == "m")
 		{
+	    	Eigen::Vector3i color;
 			if (key == "a")
 			{
 				color = PclViewerUtils::get_random_color();
 				printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
 				saved_colors.push_back(color);
+			} else {
+		    	color = anchor_color;
+	    		anchor_color = {-1,-1,-1}; // reset
 			}
 			PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
+			printf("Annotated %d points with color: %d %d %d\n", cloud_indices.size(), color[0], color[1], color[2]);
 		} else {
 			auto& pts = cloud->points;
 			if (key == "d")
@@ -521,12 +523,14 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 				extractParentIndices(child_indices, current_indices, remain_indices);
 				current_indices = child_indices;
 				cloud = extract_cloud(cloud, cloud_indices, true);
+				printf("Deleted %d points\n", cloud_indices.size());
 			} else if (key == "x")
 			{
 				std::vector<int> child_indices;
 				extractParentIndices(child_indices, current_indices, cloud_indices);
 				current_indices = child_indices;
 				cloud = extract_cloud(cloud, cloud_indices, false);
+				printf("Extracted %d points\n", cloud_indices.size());
 			} else if (key == "u")
 			{
 				for (int i = 0; i < cloud_indices.size(); ++i)
@@ -535,6 +539,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 					int parent_ix = current_indices[ix];
 					cloud->points[ix] = raw_cloud->points[parent_ix];
 				}
+				printf("Undo annotation for %d points\n", cloud_indices.size());
 			}
 			// std::sort(cloud_indices.begin(), cloud_indices.end()); // sort so that erase can be ordered
 			// for (int i = 0; i < cloud_indices.size(); ++i)
