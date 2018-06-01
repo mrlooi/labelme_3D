@@ -1,15 +1,16 @@
 #include <iostream>
-#include <stack>
+// #include <stack>
 
 #include <pcl/io/pcd_io.h>
 
-#include <pcl/visualization/pcl_visualizer.h>
+// #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/console/parse.h>
 
 #include <opencv2/opencv.hpp>
 
 #include "pinhole_camera.hh"
+#include "pcl_viewer_custom.hh"
 #include "pcl_viewer_utils.hh"
 
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
@@ -270,10 +271,29 @@ void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
 		}
 
 		anchor_color = saved_colors[max_color_idx];
+		printf("Selected anchor color: %d %d %d\n", anchor_color[0], anchor_color[1], anchor_color[2]);
 
 		proj_img_copy = proj_img.clone();
 		float radius = 3;
 		cv::circle( proj_img_copy, {x,y}, radius, BLUE, 3, 8, 0 );
+		
+		// // draw
+		// cv::Mat mask = cv::Mat::zeros(proj_img.size(), CV_8UC1);		
+		// for (int x = 0; x < proj_img.cols; ++x)
+		// {
+		// 	for (int y = 0; y < proj_img.rows; ++y)
+		// 	{
+		// 		const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
+		// 		if (px[0] == anchor_color[0] && px[1] == anchor_color[1] && px[2] == anchor_color[2])
+		// 		{
+		// 			mask.at<uchar>(y,x) = 255;
+		// 		}
+		// 	}
+		// }
+  //       std::vector<cv::Vec4i> hierarchy;
+  //       std::vector<std::vector<cv::Point>> out_contours;
+  //       cv::findContours(mask, out_contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+  //       cv::drawContours(proj_img_copy, out_contours, -1, cv::Scalar(255, 0, 0), 2, 8);
 	}
 }
 
@@ -485,6 +505,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			if (key == "a")
 			{
 				color = PclViewerUtils::get_random_color();
+				printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
 				saved_colors.push_back(color);
 			}
 			PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
@@ -602,7 +623,8 @@ int main(int argc, char *argv[])
   	current_indices[i] = i;
   }
 
-  pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer);
+  PCLInteractorCustom* style = PCLInteractorCustom::New(); 
+  pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(style));
   viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
   viewer->registerMouseCallback(mouseEventOccurred, (void*)&viewer);
   viewer->addCoordinateSystem();

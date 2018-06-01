@@ -26,5 +26,9 @@ target_link_libraries (pinhole_test ${PCL_LIBRARIES} ${OpenCV_LIBS})
 #add_executable (label_3d_cloud_seg ../test/label_3d_cloud_seg.cpp ../src/plane_segmenter.cc ../src/segmenter_params.cc)
 #target_link_libraries (label_3d_cloud_seg ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
-add_executable (labelme_3d ../test/labelme_3d.cpp)
+add_executable (labelme_3d ../test/labelme_3d.cpp ../src/pcl_viewer_custom.cc)
 target_link_libraries (labelme_3d ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable (pcl_viewer_test ../test/pcl_viewer_test.cpp ../src/pcl_viewer_custom.cc)
+target_link_libraries (pcl_viewer_test ${PCL_LIBRARIES})
+
