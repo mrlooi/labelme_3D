@@ -446,10 +446,10 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 	{
 		if (key == "a")
 		{
-			printf("Operation: EDIT\n");
+			printf("Operation: ANNOTATE\n");
 		} else if (key == "u")
 		{
-			printf("Operation: ORIGINAL COLOR\n");
+			printf("Operation: UNDO ANNOTATION\n");
 			if (undo_data.size() == 0)
 			{
 				printf("No previous clouds to extract original color!\n");
@@ -461,19 +461,21 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		} else if (key == "x")
 		{
 			printf("Operation: EXTRACT\n");
-		}
+		} else if (key == "m")
+		{
+			printf("Operation: MERGE\n");
+			if (saved_colors.size() == 0)
+			{
+				printf("There are currently no valid annotation colors\n");	
+				return;
+			}
+		} 
 
     	project();
 
     	Eigen::Vector3i color;
 		if (key == "m")
 		{
-			printf("Operation: Merge\n");
-			if (saved_colors.size() == 0)
-			{
-				printf("There are currently no valid annotation colors\n");	
-				return;
-			}
 			printf("Select an anchor point, then draw an extra polygon \n");
 	    	trigger_cv_window_merge();
 	    	color = anchor_color;

@@ -1,29 +1,14 @@
 #include "pcl_viewer_custom.hh"
 
 #include <vtkVersion.h>
-#include <vtkLODActor.h>
 #include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkCellArray.h>
-#include <vtkTextProperty.h>
-#include <vtkAbstractPropPicker.h>
 #include <vtkCamera.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkScalarBarActor.h>
-#include <vtkPNGWriter.h>
 #include <vtkWindowToImageFilter.h>
-#include <vtkRendererCollection.h>
-#include <vtkActorCollection.h>
-#include <vtkLegendScaleActor.h>
 #include <vtkRenderer.h>
 #include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
 #include <vtkObjectFactory.h>
-#include <vtkProperty.h>
-#include <vtkPointData.h>
-#include <vtkAssemblyPath.h>
-#include <vtkAbstractPicker.h>
-#include <vtkPointPicker.h>
-#include <vtkAreaPicker.h>
+
 
 #if VTK_RENDERING_BACKEND_OPENGL_VERSION < 2
 #include <pcl/visualization/vtk/vtkVertexBufferObjectMapper.h>
@@ -55,7 +40,7 @@ void PCLInteractorCustom::OnKeyDown ()
 	{
 		wif_->SetInput (Interactor->GetRenderWindow ());
 		wif_->Modified ();
-		snapshot_writer_->Modified ();
+		// snapshot_writer_->Modified ();
 	}
 
 	// Save the initial windows width/height

@@ -4,6 +4,8 @@
 #include <pcl/visualization/interactor_style.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
+
+// https://github.com/PointCloudLibrary/pcl/blob/master/visualization/include/pcl/visualization/interactor_style.h
 class PCLInteractorCustom: public pcl::visualization::PCLVisualizerInteractorStyle
 {
 public:
@@ -20,6 +22,8 @@ protected:
 	void OnChar () override;
 };
 
+
+// https://github.com/PointCloudLibrary/pcl/blob/master/visualization/include/pcl/visualization/pcl_visualizer.h
 class PCLVisCustom: public pcl::visualization::PCLVisualizer
 {
 public:
