@@ -24,7 +24,7 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Extract: `x`  (extracts all points in the polygon -> opposite of "delete")
 - Undo: `Ctrl + z`
 - Redo: `Ctrl + y`
-- Save: `Ctrl + s`  (saves to output_file, must be set as an argument with '-s', see Usage)
+- Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting pcd_file and json_file argument)
 - Quit: `q`  (quits the program)
 
 ### OpenCV pop-up window
@@ -34,7 +34,7 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Quit: `q`  (closes the pop-up window (but not the PCL viewer))
 
 ## Usage
-./labelme_3d pcd_file [-s output_file] 
+./labelme_3d pcd_file [-s pcd_file] [-j json_file]
 
 ## Requirements
 - PCL
