@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 // #include <stack>
 
 #include <pcl/io/pcd_io.h>
@@ -8,6 +9,8 @@
 #include <pcl/console/parse.h>
 
 #include <opencv2/opencv.hpp>
+
+#include <json.hpp>	
 
 #include "pinhole_camera.hh"
 #include "pcl_viewer_custom.hh"
@@ -32,7 +35,9 @@ int focal = 800;
 pcl::PointCloud<PointT>::Ptr raw_cloud (new pcl::PointCloud<PointT>);
 pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>);
 
-std::string save_file = "./labelme_3d_out.pcd";
+std::string pcd_file;
+std::string out_pcd_file = "./labelme_3d_out.pcd";
+std::string out_json_file = "./labelme_3d_out.json";
 
 // Eigen::MatrixXi uv_idx_map;
 std::vector<std::vector<std::vector<int>>> uv_idx_map;
@@ -142,6 +147,8 @@ void project()
   pinhole_cam.set_image_height(img_height);
 
   pinhole_cam.set_camera_pose(viewer_pose);
+  std::cout << "Projecting with camera pose: " << viewer_pose << std::endl;
+
   pinhole_cam.set_input_cloud(cloud);
 
   // pinhole_cam.project_surface(proj_img, uv_idx_map, 0.03);
@@ -429,6 +436,44 @@ pcl::PointCloud<PointT>::Ptr extract_cloud(pcl::PointCloud<PointT>::Ptr cloud, s
 	return extract_cloud(cloud, indices_ptr, negative);
 }
 
+void save_data()
+{
+	nlohmann::json j;
+	// save original cloud file name
+	j["pcd"] = pcd_file;
+
+	// save annotation colors
+	size_t total_colors = saved_colors.size();
+	std::vector<std::vector<int>> colors(total_colors);
+	for (size_t i = 0; i < total_colors; ++i)
+	{
+		const auto& colr = saved_colors[i];
+		colors[i] = {colr[0], colr[1], colr[2]}; // b g r
+	}
+	j["colors"] = colors;
+
+	// save all remaining indices + color for each
+	size_t total_idx = current_indices.size();
+	std::vector<std::vector<int>> data(total_idx);
+	for (size_t i = 0; i < total_idx; ++i)
+	{
+		int idx = current_indices[i];
+		const PointT& pt = cloud->points[i];
+		data[i] = {idx, pt.b, pt.g, pt.r};  // idx bgr
+	}
+	j["data"] = data;
+
+	// save to file
+    std::ofstream file(out_json_file);
+    if (file.is_open()) 
+    {
+    	file << j;
+    	printf("Saved data to %s\n", out_json_file.c_str());
+    	file.close();
+    } else {
+    	printf("FAILED to open %s\n", out_json_file.c_str());
+    }
+}
 
 void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer_void)
 {
@@ -556,12 +601,18 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 	{
 		if (key == "s")
 		{
-			if (save_file.size() > 0)
+			if (out_pcd_file.size() > 0)
 			{
-				pcl::io::savePCDFileBinary(save_file, *cloud);
-				printf("Saved to %s\n", save_file.c_str());
+				pcl::io::savePCDFileBinary(out_pcd_file, *cloud);
+				printf("Saved to %s\n", out_pcd_file.c_str());
 			} else {
-				printf("Please pass a valid file to save_file [-s] argument\n");
+				printf("Please pass a valid file to out_pcd_file [-s] argument\n");
+			}
+			if (out_json_file.size() > 0)
+			{
+				save_data();
+			} else {
+				printf("Please pass a json file\n");
 			}
 		}
 		else if (key == "z")
@@ -602,7 +653,6 @@ void mouseEventOccurred(const pcl::visualization::MouseEvent &event, void* viewe
 
 int main(int argc, char *argv[])
 {
-  std::string pcd_file;
   if (argc <= 1)
   {
   	printf("Usage: %s pcd_file\n", argv[0]);
@@ -620,7 +670,7 @@ int main(int argc, char *argv[])
   pcl::console::parse (argc, argv, "-width", img_width);
   pcl::console::parse (argc, argv, "-height", img_height);
   pcl::console::parse (argc, argv, "-focal", focal);
-  pcl::console::parse (argc, argv, "-s", save_file);
+  pcl::console::parse (argc, argv, "-s", out_pcd_file);
 
   *cloud += *raw_cloud;
 

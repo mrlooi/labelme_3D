@@ -32,3 +32,5 @@ target_link_libraries (labelme_3d ${PCL_LIBRARIES} ${OpenCV_LIBS})
 add_executable (pcl_viewer_test ../test/pcl_viewer_test.cpp ../src/pcl_viewer_custom.cc)
 target_link_libraries (pcl_viewer_test ${PCL_LIBRARIES})
 
+add_executable (read_labelme_data ../test/read_labelme_data.cpp)
+target_link_libraries (read_labelme_data ${PCL_LIBRARIES} ${OpenCV_LIBS})
