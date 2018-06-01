@@ -24,7 +24,7 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Extract: `x`  (extracts all points in the polygon -> opposite of "delete")
 - Undo: `Ctrl + z`
 - Redo: `Ctrl + y`
-- Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting pcd_file and json_file argument)
+- Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file (**see below for reading the output json**) containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)
 - Quit: `q`  (quits the program)
 
 ### OpenCV pop-up window
@@ -34,7 +34,14 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Quit: `q`  (closes the pop-up window (but not the PCL viewer))
 
 ## Usage
-./labelme_3d pcd_file [-s pcd_file] [-j json_file]
+`./labelme_3d pcd_file [-s out_pcd_file] [-j out_json_file]`  
+Default out_pcd_file path: ./labelme_3d_out.pcd
+Default out_json_file path: ./labelme_3d_out.json
+
+## Reading output json file
+Read the output json file and display the annotated pointcloud. The file will also show the projected pointcloud onto a 2D image, though for this you'll need to manually set the 4x4 viewer pose in read_labelme_data.cpp  
+`./read_labelme_data original_pcd_file out_json_file`  
+
 
 ## Requirements
 - PCL
