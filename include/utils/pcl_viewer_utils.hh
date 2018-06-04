@@ -2,8 +2,11 @@
 #ifndef VISION_PCL_VIEWER_UTILS_HH
 #define VISION_PCL_VIEWER_UTILS_HH
 
+#include <time.h>
+
 #include <pcl/visualization/cloud_viewer.h>
 #include <opencv2/highgui.hpp>
+
 
 namespace PclViewerUtils
 {
@@ -12,9 +15,11 @@ const static Eigen::Vector3i BLUE {0,0,255};
 const static Eigen::Vector3i GREEN {0,255,0};
 const static Eigen::Vector3i RED {255,0,0};
 
-static cv::RNG cv_rng(12345);
 static inline Eigen::Vector3i get_random_color()
 {
+  srand(time(0));
+  cv::RNG cv_rng(rand());
+
 	Eigen::Vector3i color {cv_rng.uniform(0, 255), cv_rng.uniform(0,255), cv_rng.uniform(0,255)};
 	return color;
 }

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+// #include <unordered_map>  
 // #include <stack>
 
 #include <pcl/io/pcd_io.h>
@@ -54,6 +55,7 @@ Eigen::Vector3i anchor_color {-1,-1,-1};
 std::vector<int> current_indices;
 
 std::vector<Eigen::Vector3i> saved_colors;
+// std::unordered_map<int> color_hash_map;
 
 struct OpData {
 	pcl::PointCloud<PointT>::Ptr cloud;
@@ -64,6 +66,33 @@ std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
 
 
+Eigen::Vector3i generate_random_color()
+{
+	Eigen::Vector3i color;
+	while (true)
+	{
+		color = PclViewerUtils::get_random_color();
+		bool is_used = false;
+		for (int i = 0; i < saved_colors.size(); ++i)  // there are obviously much faster ways to do this e.g. hash, too lazy
+		{
+			const auto& c = saved_colors[i];
+			if (color[0] == c[0] && color[1] == c[1] && color[2] == c[2])
+			{
+				is_used = true;
+				break;
+			}
+		}
+		if (!is_used)
+			break;
+		// int hash = color[0] + color[1] << 1 + color[2] << 2;
+		// if (color_hash_map.find(hash) == color_hash_map.end())
+		// {
+
+		// 	break;
+		// }
+	}
+	return color;
+}
 
 void pt_to_rect(const cv::Point& pt, cv::Rect& rect, int width, int height)
 {
@@ -543,7 +572,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 				Eigen::Vector3i color;
 				if (key == "a")
 				{
-					color = PclViewerUtils::get_random_color();
+					color = generate_random_color();
 					printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
 					saved_colors.push_back(color);
 				} else {
