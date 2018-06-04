@@ -10,8 +10,6 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <json.hpp>	
-
 #include "pinhole_camera.hh"
 #include "pcl_viewer_custom.hh"
 #include "pcl_viewer_utils.hh"

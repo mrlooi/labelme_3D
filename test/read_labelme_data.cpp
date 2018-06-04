@@ -5,12 +5,8 @@
 
 #include <opencv2/opencv.hpp>
 
-#include <json.hpp> 
-
 #include "pinhole_camera.hh"
 #include "labelme_io.hh"
-
-using namespace nlohmann;
 
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
 
