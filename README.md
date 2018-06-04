@@ -10,9 +10,9 @@ This tool is comprised of 2 components:
 - PCL Viewer
 - OpenCV pop-up window
 
-PCL viewer is used to visualize the pointcloud from arbitrary camera viewpoints. 
-Each time an operation on the pointcloud is about to be performed, a window (OpenCV window) will pop up and display the 2D-projected image generated from the current camera viewpoint.
-An operation is usually conducted via drawing polygons on the projected image of the pointcloud. A polygon generates a mask on the image, and the mask is then mapped back onto the 3D points in the pointcloud.
+PCL viewer is used to visualize the pointcloud from arbitrary camera viewpoints.  
+Each time an operation on the pointcloud is about to be performed, a window (OpenCV window) will pop up and display the 2D-projected image generated from the current camera viewpoint.  
+An operation is usually conducted via drawing polygons on the projected image of the pointcloud. A polygon generates a mask on the image, and the mask is then mapped back onto the 3D points in the pointcloud.  
 In the OpenCV window, use `left-click` to draw polygon points, `backspace` to undo the previous polygon point, `c` to clear all polygon points, and `q` to exit the window.
 
 ## Commands
@@ -34,9 +34,10 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Quit: `q`  (closes the pop-up window (but not the PCL viewer))
 
 ## Usage
-`./labelme_3d pcd_file [-s out_pcd_file] [-j out_json_file]`  
+`./labelme_3d pcd_file [-s out_pcd_file] [-oj out_json_file] [-ij in_json_file]`  
 - Default out_pcd_file path: ./labelme_3d_out.pcd
 - Default out_json_file path: ./labelme_3d_out.json
+- Default in_json_file path: NONE  (used for continuing annotations! pass in a previous output json file)
 
 ## Reading output json file
 Read the output json file and display the annotated pointcloud (must set the original pcd file, since the json file references the original point cloud). The file will also show the projected pointcloud onto a 2D image, though for this you'll need to manually set the 4x4 viewer pose in read_labelme_data.cpp  
