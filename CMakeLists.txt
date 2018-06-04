@@ -17,8 +17,8 @@ add_definitions(${PCL_DEFINITIONS})
 include_directories(include)
 include_directories(include/utils)
 
-add_executable (read_sm_file ../test/read_sm_file.cpp)
-target_link_libraries (read_sm_file ${PCL_LIBRARIES} ${OpenCV_LIBS})
+#add_executable (read_sm_file ../test/read_sm_file.cpp)
+#target_link_libraries (read_sm_file ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable (pinhole_test ../test/pinhole_test.cpp)
 target_link_libraries (pinhole_test ${PCL_LIBRARIES} ${OpenCV_LIBS})
