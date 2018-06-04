@@ -652,9 +652,7 @@ void read_data()
 
 	if (in_json_file.size() > 0)
 	{
-		printf("BEFORE READ\n");
 		json_is_valid = labelme::read_data(in_json_file, l_data);
-		printf("AFTER READ\n");
 	}
 
 	if (json_is_valid)
