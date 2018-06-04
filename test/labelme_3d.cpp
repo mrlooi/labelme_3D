@@ -566,6 +566,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 
 			// add current cloud to undo stack
 			add_current_cloud_to_stack();
+			save_data(); // auto save
 
 			if (key == "a" || key == "m")
 			{
