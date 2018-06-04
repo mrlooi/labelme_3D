@@ -29,11 +29,11 @@ static bool LoadDataFromJson(json& j, const std::string json_file)
         catch (const std::invalid_argument& ia)
         {
             std::cerr << "INVALID JSON in " << json_file << std::endl;
-        } catch (json::parse_error &e)
+        }/* catch (json::parse_error &e)
         {
             std::cerr << e.what() << std::endl;
             std::cerr << "FAILED to parse " << json_file << std::endl;
-        }
+        }*/
         f.close();
     }
     else
