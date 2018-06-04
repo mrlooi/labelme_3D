@@ -16,6 +16,9 @@
 #include "pcl_viewer_custom.hh"
 #include "pcl_viewer_utils.hh"
 
+#include "labelme_io.hh"
+
+
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
 
 typedef pcl::PointXYZRGBA PointT;
@@ -38,6 +41,7 @@ pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>);
 std::string pcd_file;
 std::string out_pcd_file = "./labelme_3d_out.pcd";
 std::string out_json_file = "./labelme_3d_out.json";
+std::string in_json_file = "";
 
 // Eigen::MatrixXi uv_idx_map;
 std::vector<std::vector<std::vector<int>>> uv_idx_map;
@@ -73,28 +77,28 @@ void pt_to_rect(const cv::Point& pt, cv::Rect& rect, int width, int height)
 
 inline void extractParentIndices(std::vector<int>& indices, const std::vector<int>& parent_indices, const std::vector<int>& child_indices)
 {
-    assert(child_indices.size() <= parent_indices.size());
-    indices.clear();
-    indices.reserve(child_indices.size());
-    for (size_t i = 0; i < child_indices.size(); ++i)
-    {
-        indices.push_back(parent_indices[child_indices[i]]);
-    }
+	assert(child_indices.size() <= parent_indices.size());
+	indices.clear();
+	indices.reserve(child_indices.size());
+	for (size_t i = 0; i < child_indices.size(); ++i)
+	{
+		indices.push_back(parent_indices[child_indices[i]]);
+	}
 }
 
 template <typename T>
 inline void set_diff(std::vector<T>& result, const std::vector<T>& first, const std::vector<T>& second, bool sorted=true)
 {
-    if (!sorted)
-    {
-        auto sorted_first = first;
-        auto sorted_second = second;
-        std::sort(sorted_first.begin(), sorted_first.end());
-        std::sort(sorted_second.begin(), sorted_second.end());
-        std::set_difference(sorted_first.begin(),sorted_first.end(),sorted_second.begin(),sorted_second.end(),std::inserter(result, result.end()));
-    } else {
-        std::set_difference(first.begin(),first.end(),second.begin(),second.end(),std::inserter(result, result.end()));
-    }
+	if (!sorted)
+	{
+		auto sorted_first = first;
+		auto sorted_second = second;
+		std::sort(sorted_first.begin(), sorted_first.end());
+		std::sort(sorted_second.begin(), sorted_second.end());
+		std::set_difference(sorted_first.begin(),sorted_first.end(),sorted_second.begin(),sorted_second.end(),std::inserter(result, result.end()));
+	} else {
+		std::set_difference(first.begin(),first.end(),second.begin(),second.end(),std::inserter(result, result.end()));
+	}
 }
 
 inline void get_outliers(std::vector<int>& outliers, const std::vector<int>& inliers, const int cloud_sz)
@@ -139,23 +143,23 @@ void project()
 {
 
 
-  float cx = 0.5 * img_width;
-  float cy = 0.5 * img_height;
+	float cx = 0.5 * img_width;
+	float cy = 0.5 * img_height;
 
-  PinholeCamera<PointT> pinhole_cam(focal, cx, cy);
-  pinhole_cam.set_image_width(img_width);
-  pinhole_cam.set_image_height(img_height);
+	PinholeCamera<PointT> pinhole_cam(focal, cx, cy);
+	pinhole_cam.set_image_width(img_width);
+	pinhole_cam.set_image_height(img_height);
 
-  pinhole_cam.set_camera_pose(viewer_pose);
-  std::cout << "Projecting with camera pose: " << viewer_pose << std::endl;
+	pinhole_cam.set_camera_pose(viewer_pose);
+	std::cout << "Projecting with camera pose: " << viewer_pose << std::endl;
 
-  pinhole_cam.set_input_cloud(cloud);
+	pinhole_cam.set_input_cloud(cloud);
 
-  // pinhole_cam.project_surface(proj_img, uv_idx_map, 0.03);
-  pinhole_cam.project(proj_img, uv_idx_map);
-  // pinhole_cam.project_non_occluded_surface(proj_img, uv_idx_map, octree_resolution);
-  proj_img_copy = proj_img.clone();
-  
+	// pinhole_cam.project_surface(proj_img, uv_idx_map, 0.03);
+	pinhole_cam.project(proj_img, uv_idx_map);
+	// pinhole_cam.project_non_occluded_surface(proj_img, uv_idx_map, octree_resolution);
+	proj_img_copy = proj_img.clone();
+
 }
 
 void drawPoints(cv::Mat& img_out, const std::vector<cv::Point>& pts)
@@ -183,50 +187,49 @@ void drawPoints(cv::Mat& img_out, const std::vector<cv::Point>& pts)
 
 static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewer, Eigen::Matrix4f& view_pose)
 {
-  Eigen::Affine3f pose_af = viewer->getViewerPose();
-  Eigen::Affine3f pose_af_inv = pose_af.inverse();
-  for (int i = 0; i < 4; ++i)
-  {
-	view_pose(i,0) = pose_af_inv(i,0);
-	view_pose(i,1) = pose_af_inv(i,1);
-	view_pose(i,2) = pose_af_inv(i,2);
-	view_pose(i,3) = pose_af_inv(i,3);
-  }
-  // // rotate along z-axis by 180
-  Eigen::Matrix4f z_180_m = Eigen::Matrix4f::Identity();
-  z_180_m(0,0) = -1;
-  z_180_m(1,1) = -1;
-  viewer_pose = z_180_m * viewer_pose;
+	Eigen::Affine3f pose_af = viewer->getViewerPose();
+	Eigen::Affine3f pose_af_inv = pose_af.inverse();
+	for (int i = 0; i < 4; ++i)
+	{
+		view_pose(i,0) = pose_af_inv(i,0);
+		view_pose(i,1) = pose_af_inv(i,1);
+		view_pose(i,2) = pose_af_inv(i,2);
+		view_pose(i,3) = pose_af_inv(i,3);
+	}
+	// // rotate along z-axis by 180
+	Eigen::Matrix4f z_180_m = Eigen::Matrix4f::Identity();
+	z_180_m(0,0) = -1;
+	z_180_m(1,1) = -1;
+	viewer_pose = z_180_m * viewer_pose;
 
-  // viewer_pose(0,0) = -viewer_pose(0,0);  // z axis is flipped
-  // viewer_pose(1,1) = -viewer_pose(1,1);  // z axis is flipped
-  // // viewer_pose(2,2) = -viewer_pose(2,2);  // z axis is flipped
+	// viewer_pose(0,0) = -viewer_pose(0,0);  // z axis is flipped
+	// viewer_pose(1,1) = -viewer_pose(1,1);  // z axis is flipped
+	// // viewer_pose(2,2) = -viewer_pose(2,2);  // z axis is flipped
 }
 
 void PolygonCallbackFunc(int event, int x, int y, int flags, void* userdata)
 {
-	 if  ( event == cv::EVENT_LBUTTONDOWN )
-	 {
-		  // cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-		  cv::Point pt {x,y};
-		  img_pts.push_back(pt);
-		  proj_img_copy = proj_img.clone();
-		  drawPoints(proj_img_copy, img_pts);
-	 }
-	 else if  ( event == cv::EVENT_RBUTTONDOWN )
-	 {
-		  cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	 }
-	 else if  ( event == cv::EVENT_MBUTTONDOWN )
-	 {
-		  cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	 }
-	  else if  ( event == 'x' )
-	 {
-		  cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	 }
-
-	 cv::imshow("My Window", proj_img_copy);
+	if  ( event == cv::EVENT_LBUTTONDOWN )
+	{
+		// cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+		cv::Point pt {x,y};
+		img_pts.push_back(pt);
+		proj_img_copy = proj_img.clone();
+		drawPoints(proj_img_copy, img_pts);
+	}
+	else if  ( event == cv::EVENT_RBUTTONDOWN )
+	{
+		cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+	}
+	else if  ( event == cv::EVENT_MBUTTONDOWN )
+	{
+		cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+	}
+	 else if  ( event == 'x' )
+	{
+		cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+	}
+	cv::imshow("My Window", proj_img_copy);
 }
 
 void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
@@ -244,19 +247,19 @@ void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
 		// printf("Anchor Rect: %d %d %d %d\n", anchor_rect.x, anchor_rect.y, anchor_rect.x + anchor_rect.width, anchor_rect.y + anchor_rect.height);
 		for (int x = anchor_rect.x; x < anchor_rect.x + anchor_rect.width; ++x)
 		{	
-	    	for (int y = anchor_rect.y; y < anchor_rect.y + anchor_rect.height; ++y)
-	    	{
+			for (int y = anchor_rect.y; y < anchor_rect.y + anchor_rect.height; ++y)
+			{
 				const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
-		    	for (int c = 0; c < total_colors; ++c)
-		    	{
-		    		const auto& s_color = saved_colors[c];
+				for (int c = 0; c < total_colors; ++c)
+				{
+					const auto& s_color = saved_colors[c];
 					if (px[0] == s_color[0] && px[1] == s_color[1] && px[2] == s_color[2])
 					{
 						saved_colors_count[c] += 1;
 						break;
 					}
-		    	}
-	    	}
+				}
+			}
 		}
 
 		// check if color matches a saved color
@@ -297,62 +300,61 @@ void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
 		// 		}
 		// 	}
 		// }
-  //       std::vector<cv::Vec4i> hierarchy;
-  //       std::vector<std::vector<cv::Point>> out_contours;
-  //       cv::findContours(mask, out_contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-  //       cv::drawContours(proj_img_copy, out_contours, -1, cv::Scalar(255, 0, 0), 2, 8);
+//       std::vector<cv::Vec4i> hierarchy;
+//       std::vector<std::vector<cv::Point>> out_contours;
+//       cv::findContours(mask, out_contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+//       cv::drawContours(proj_img_copy, out_contours, -1, cv::Scalar(255, 0, 0), 2, 8);
 	}
 }
 
 void trigger_cv_window()
 {
-  // cv::flip(proj_img, proj_img, -1); // rotate by 180
+	// cv::flip(proj_img, proj_img, -1); // rotate by 180
 
-  //Create a window
-  cv::namedWindow("My Window", 1);
+	//Create a window
+	cv::namedWindow("My Window", 1);
 
-  //set the callback function for any mouse event
-  cv::setMouseCallback("My Window", PolygonCallbackFunc, NULL);
+	//set the callback function for any mouse event
+	cv::setMouseCallback("My Window", PolygonCallbackFunc, NULL);
 
-  //show the image
-  while (1)
-  {
-	// SEE https://progtpoint.blogspot.com/2017/06/key-board-ascii-key-code.html
-
-	cv::imshow("My Window", proj_img_copy);
-
-	char key = (char) cv::waitKey(10); 
-	
-	if (key == 'c') // backspace
+	//show the image
+	while (1)
 	{
-	  cout << "C PRESSED\n";
-	  img_pts.clear();
+		// SEE https://progtpoint.blogspot.com/2017/06/key-board-ascii-key-code.html
 
-	  proj_img_copy = proj_img.clone();
-	  drawPoints(proj_img_copy, img_pts);
-	}
-	else if (key == 8) // backspace
-	{
-	  cout << "BACKSPACE PRESSED\n";
-	  if (img_pts.size() == 0)
-		continue;
-	  img_pts.pop_back();
-	  // show again
-	  proj_img_copy = proj_img.clone();
-	  drawPoints(proj_img_copy, img_pts);
-	}
-	else if (key == 13) // enter
-	{
-	  cout << "ENTER PRESSED\n";
-	  break;
-	}
-	else if (key == 'q')
-	{
-	  break;
-	}
-  }
+		cv::imshow("My Window", proj_img_copy);
 
-  cv::destroyWindow("My Window");
+		char key = (char) cv::waitKey(10); 
+		
+		if (key == 'c') // backspace
+		{
+			cout << "C PRESSED\n";
+			img_pts.clear();
+			proj_img_copy = proj_img.clone();
+			drawPoints(proj_img_copy, img_pts);
+		}
+		else if (key == 8) // backspace
+		{
+			cout << "BACKSPACE PRESSED\n";
+			if (img_pts.size() == 0)
+				continue;
+			img_pts.pop_back();
+			// show again
+			proj_img_copy = proj_img.clone();
+			drawPoints(proj_img_copy, img_pts);
+		}
+		else if (key == 13) // enter
+		{
+			cout << "ENTER PRESSED\n";
+			break;
+		}
+		else if (key == 'q')
+		{
+			break;
+		}
+	}
+
+	cv::destroyWindow("My Window");
 }
 
 
@@ -438,254 +440,290 @@ pcl::PointCloud<PointT>::Ptr extract_cloud(pcl::PointCloud<PointT>::Ptr cloud, s
 
 void save_data()
 {
-	nlohmann::json j;
-	// save original cloud file name
-	j["pcd"] = pcd_file;
+	labelme::LabelMeData l_data;
 
-	// save annotation colors
-	size_t total_colors = saved_colors.size();
-	std::vector<std::vector<int>> colors(total_colors);
-	for (size_t i = 0; i < total_colors; ++i)
-	{
-		const auto& colr = saved_colors[i];
-		colors[i] = {colr[0], colr[1], colr[2]}; // b g r
-	}
-	j["colors"] = colors;
+	l_data.pcd_file = pcd_file;
+	l_data.colors = saved_colors;
 
 	// save all remaining indices + color for each
 	size_t total_idx = current_indices.size();
-	std::vector<std::vector<int>> data(total_idx);
+	l_data.data.resize(total_idx);
 	for (size_t i = 0; i < total_idx; ++i)
 	{
 		int idx = current_indices[i];
 		const PointT& pt = cloud->points[i];
-		data[i] = {idx, pt.b, pt.g, pt.r};  // idx bgr
+		l_data.data[i] = {idx, pt.b, pt.g, pt.r};  // idx bgr
 	}
-	j["data"] = data;
 
-	// save to file
-    std::ofstream file(out_json_file);
-    if (file.is_open()) 
-    {
-    	file << j;
-    	printf("Saved data to %s\n", out_json_file.c_str());
-    	file.close();
-    } else {
-    	printf("FAILED to open %s\n", out_json_file.c_str());
-    }
+	// save
+	bool rt = labelme::save_data(out_json_file, l_data);
+	if (rt)
+	{
+		printf("Saved data to %s\n", out_json_file.c_str());
+	} else {
+		printf("FAILED to open %s\n", out_json_file.c_str());
+	}
+}
+
+void add_current_cloud_to_stack()
+{
+	// add current cloud to undo stack
+	pcl::PointCloud<PointT>::Ptr cur_cloud (new pcl::PointCloud<PointT>);
+	*cur_cloud += *cloud;
+	OpData op_data;
+	op_data.cloud = cur_cloud;
+	op_data.parent_indices = current_indices;
+	undo_data.push_back(op_data);
+	redo_data.clear();
 }
 
 void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer_void)
 {
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
 
-  std::string key = event.getKeySym();
+	std::string key = event.getKeySym();
 
-  bool refresh_cloud = false;
-  if (event.keyDown())
-  {
-	get_viewer_pose(viewer, viewer_pose);
-
-	bool is_ctrl = event.isCtrlPressed();
-	if (key == "a" || key == "u" || key == "d" || key == "x" || key == "m")
+	bool refresh_cloud = false;
+	if (event.keyDown())
 	{
-		if (key == "a")
-		{
-			printf("Operation: ANNOTATE\n");
-		} else if (key == "u")
-		{
-			printf("Operation: UNDO ANNOTATION\n");
-			if (saved_colors.size() == 0)
-			{
-				printf("There are currently no valid annotation colors\n");	
-				return;	
-			} 
-		} else if (key == "d")
-		{
-			printf("Operation: DELETE\n");
-		} else if (key == "x")
-		{
-			printf("Operation: EXTRACT\n");
-		} else if (key == "m")
-		{
-			printf("Operation: MERGE\n");
-			if (saved_colors.size() == 0)
-			{
-				printf("There are currently no valid annotation colors\n");	
-				return;
-			}
-		} 
+		get_viewer_pose(viewer, viewer_pose);
 
-    	project();
-
-		if (key == "m")
+		bool is_ctrl = event.isCtrlPressed();
+		if (key == "a" || key == "u" || key == "d" || key == "x" || key == "m")
 		{
-			printf("Select an anchor point, then draw an extra polygon \n");
-	    	trigger_cv_window_merge();
-		} else {
-			trigger_cv_window();			
-		}
-
-		cv::Mat mask = get_mask();
-		std::vector<int> cloud_indices;
-		get_mask_3d_points(mask, cloud_indices);
-		if (cloud_indices.size() == 0)
-		{
-			img_pts.clear();
-			return;
-		}
-
-		// add current cloud to undo stack
-		pcl::PointCloud<PointT>::Ptr cur_cloud (new pcl::PointCloud<PointT>);
-		*cur_cloud += *cloud;
-		OpData op_data;
-		op_data.cloud = cur_cloud;
-		op_data.parent_indices = current_indices;
-		undo_data.push_back(op_data);
-		redo_data.clear();
-
-		if (key == "a" || key == "m")
-		{
-	    	Eigen::Vector3i color;
 			if (key == "a")
 			{
-				color = PclViewerUtils::get_random_color();
-				printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
-				saved_colors.push_back(color);
-			} else {
-		    	color = anchor_color;
-	    		anchor_color = {-1,-1,-1}; // reset
-			}
-			PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
-			printf("Annotated %d points with color: %d %d %d\n", cloud_indices.size(), color[0], color[1], color[2]);
-		} else {
-			auto& pts = cloud->points;
-			if (key == "d")
-			{
-				std::vector<int> remain_indices;
-				get_outliers(remain_indices, cloud_indices, cloud->size());
-				std::vector<int> child_indices;
-				extractParentIndices(child_indices, current_indices, remain_indices);
-				current_indices = child_indices;
-				cloud = extract_cloud(cloud, cloud_indices, true);
-				printf("Deleted %d points\n", cloud_indices.size());
-			} else if (key == "x")
-			{
-				std::vector<int> child_indices;
-				extractParentIndices(child_indices, current_indices, cloud_indices);
-				current_indices = child_indices;
-				cloud = extract_cloud(cloud, cloud_indices, false);
-				printf("Extracted %d points\n", cloud_indices.size());
+				printf("Operation: ANNOTATE\n");
 			} else if (key == "u")
 			{
-				for (int i = 0; i < cloud_indices.size(); ++i)
+				printf("Operation: UNDO ANNOTATION\n");
+				if (saved_colors.size() == 0)
 				{
-					int ix = cloud_indices[i];
-					int parent_ix = current_indices[ix];
-					cloud->points[ix] = raw_cloud->points[parent_ix];
+					printf("There are currently no valid annotation colors\n");	
+					return;	
+				} 
+			} else if (key == "d")
+			{
+				printf("Operation: DELETE\n");
+			} else if (key == "x")
+			{
+				printf("Operation: EXTRACT\n");
+			} else if (key == "m")
+			{
+				printf("Operation: MERGE\n");
+				if (saved_colors.size() == 0)
+				{
+					printf("There are currently no valid annotation colors\n");	
+					return;
 				}
-				printf("Undo annotation for %d points\n", cloud_indices.size());
-			}
-			// std::sort(cloud_indices.begin(), cloud_indices.end()); // sort so that erase can be ordered
-			// for (int i = 0; i < cloud_indices.size(); ++i)
-			// {
-			// 	int idx = cloud_indices[i] - i;
-			// 	pts.erase(pts.begin() + idx);
-			// }
-		}
-		img_pts.clear();
+			} 
 
-		refresh_cloud = true;
-	} 
-	if (is_ctrl)
-	{
-		if (key == "s")
-		{
-			if (out_pcd_file.size() > 0)
+			project();
+
+			if (key == "m")
 			{
-				pcl::io::savePCDFileBinary(out_pcd_file, *cloud);
-				printf("Saved to %s\n", out_pcd_file.c_str());
+				printf("Select an anchor point, then draw an extra polygon \n");
+				trigger_cv_window_merge();
 			} else {
-				printf("Please pass a valid file to out_pcd_file [-s] argument\n");
+				trigger_cv_window();			
 			}
-			if (out_json_file.size() > 0)
+
+			cv::Mat mask = get_mask();
+			std::vector<int> cloud_indices;
+			get_mask_3d_points(mask, cloud_indices);
+			if (cloud_indices.size() == 0)
 			{
-				save_data();
+				img_pts.clear();
+				return;
+			}
+
+			// add current cloud to undo stack
+			add_current_cloud_to_stack();
+
+			if (key == "a" || key == "m")
+			{
+				Eigen::Vector3i color;
+				if (key == "a")
+				{
+					color = PclViewerUtils::get_random_color();
+					printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
+					saved_colors.push_back(color);
+				} else {
+					color = anchor_color;
+					anchor_color = {-1,-1,-1}; // reset
+				}
+				PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
+				printf("Annotated %d points with color: %d %d %d\n", cloud_indices.size(), color[0], color[1], color[2]);
 			} else {
-				printf("Please pass a json file\n");
+				auto& pts = cloud->points;
+				if (key == "d")
+				{
+					std::vector<int> remain_indices;
+					get_outliers(remain_indices, cloud_indices, cloud->size());
+					std::vector<int> child_indices;
+					extractParentIndices(child_indices, current_indices, remain_indices);
+					current_indices = child_indices;
+					cloud = extract_cloud(cloud, cloud_indices, true);
+					printf("Deleted %d points\n", cloud_indices.size());
+				} else if (key == "x")
+				{
+					std::vector<int> child_indices;
+					extractParentIndices(child_indices, current_indices, cloud_indices);
+					current_indices = child_indices;
+					cloud = extract_cloud(cloud, cloud_indices, false);
+					printf("Extracted %d points\n", cloud_indices.size());
+				} else if (key == "u")
+				{
+					for (int i = 0; i < cloud_indices.size(); ++i)
+					{
+						int ix = cloud_indices[i];
+						int parent_ix = current_indices[ix];
+						cloud->points[ix] = raw_cloud->points[parent_ix];
+					}
+					printf("Undo annotation for %d points\n", cloud_indices.size());
+				}
+				// std::sort(cloud_indices.begin(), cloud_indices.end()); // sort so that erase can be ordered
+				// for (int i = 0; i < cloud_indices.size(); ++i)
+				// {
+				// 	int idx = cloud_indices[i] - i;
+				// 	pts.erase(pts.begin() + idx);
+				// }
+			}
+			img_pts.clear();
+
+			refresh_cloud = true;
+		} 
+		if (is_ctrl)
+		{
+			if (key == "s")
+			{
+				if (out_pcd_file.size() > 0)
+				{
+					pcl::io::savePCDFileBinary(out_pcd_file, *cloud);
+					printf("Saved to %s\n", out_pcd_file.c_str());
+				} else {
+					printf("Please pass a valid file to out_pcd_file [-s] argument\n");
+				}
+				if (out_json_file.size() > 0)
+				{
+					save_data();
+				} else {
+					printf("Please pass a json file\n");
+				}
+			}
+			else if (key == "z")
+			{
+				printf("Ctrl+z PRESSED\n");		
+				undo();
+				refresh_cloud = true;
+			}
+			else if (key == "y")
+			{
+				printf("Ctrl+y PRESSED\n");		
+				redo();
+				refresh_cloud = true;
 			}
 		}
-		else if (key == "z")
+
+		if (refresh_cloud)
 		{
-			printf("Ctrl+z PRESSED\n");		
-			undo();
-			refresh_cloud = true;
-		}
-		else if (key == "y")
-		{
-			printf("Ctrl+y PRESSED\n");		
-			redo();
-			refresh_cloud = true;
+			viewer->removeAllPointClouds();
+			viewer->addPointCloud(cloud);
+			viewer->spin();
 		}
 	}
-
-	if (refresh_cloud)
-	{
-		viewer->removeAllPointClouds();
-		viewer->addPointCloud(cloud);
-		viewer->spin();
-	}
-  }
 }
 
 void mouseEventOccurred(const pcl::visualization::MouseEvent &event, void* viewer_void)
 {
-  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
 
-  if (event.getButton() == pcl::visualization::MouseEvent::LeftButton &&
+	if (event.getButton() == pcl::visualization::MouseEvent::LeftButton &&
 	  event.getType() == pcl::visualization::MouseEvent::MouseButtonRelease)
-  {
-	// pcl::visualization::Camera cam;
-	// viewer->getCameraParameters(cam);
-  }
+	{
+		// pcl::visualization::Camera cam;
+		// viewer->getCameraParameters(cam);
+	}
 }
 
+void read_data()
+{
+	bool json_is_valid = false;
+
+	labelme::LabelMeData l_data;
+
+	if (in_json_file.size() > 0)
+	{
+		json_is_valid = labelme::read_data(in_json_file, l_data);
+	}
+
+	if (json_is_valid)
+	{
+		add_current_cloud_to_stack();
+
+		// populate annotated colors
+		saved_colors = l_data.colors;
+
+		// populate current indices & cloud
+		size_t d_size = l_data.data.size();
+		assert (d_size <= raw_cloud->size());
+
+		current_indices.resize(d_size);
+		cloud->resize(d_size);
+		for (int i = 0; i < d_size; ++i)
+		{
+			const auto& d = l_data.data[i];
+			int idx = d[0];
+			current_indices[i] = idx;
+			PointT pt = raw_cloud->points[idx];
+			pt.b = d[1];
+			pt.g = d[2];
+			pt.r = d[3];
+			cloud->points[i] = pt;
+		}
+
+		printf("Loaded data from %s\n", in_json_file.c_str());
+	} 
+}
 
 int main(int argc, char *argv[])
 {
-  if (argc <= 1)
-  {
-  	printf("Usage: %s pcd_file\n", argv[0]);
-  	return -1;
-  }
-  pcd_file = argv[1];
+	if (argc <= 1)
+	{
+		printf("Usage: %s pcd_file\n", argv[0]);
+		return -1;
+	}
+	pcd_file = argv[1];
 
-  if ( pcl::io::loadPCDFile <PointT> (pcd_file, *raw_cloud) == -1)
-  {
-	std::cout << "Cloud reading failed." << std::endl;
-	return (-1);
-  }
+	if ( pcl::io::loadPCDFile <PointT> (pcd_file, *raw_cloud) == -1)
+	{
+		std::cout << "Cloud reading failed." << std::endl;
+		return (-1);
+	}
 
-  pcl::console::parse (argc, argv, "-ores", octree_resolution);
-  pcl::console::parse (argc, argv, "-width", img_width);
-  pcl::console::parse (argc, argv, "-height", img_height);
-  pcl::console::parse (argc, argv, "-focal", focal);
-  pcl::console::parse (argc, argv, "-s", out_pcd_file);
-  pcl::console::parse (argc, argv, "-j", out_json_file);
+	pcl::console::parse (argc, argv, "-ores", octree_resolution);
+	pcl::console::parse (argc, argv, "-width", img_width);
+	pcl::console::parse (argc, argv, "-height", img_height);
+	pcl::console::parse (argc, argv, "-focal", focal);
+	pcl::console::parse (argc, argv, "-s", out_pcd_file);
+	pcl::console::parse (argc, argv, "-ij", in_json_file);
+	pcl::console::parse (argc, argv, "-oj", out_json_file);
 
-  *cloud += *raw_cloud;
+	*cloud += *raw_cloud;
 
-  current_indices.resize(raw_cloud->size());
-  for (int i = 0; i < current_indices.size(); ++i)
-  {
-  	current_indices[i] = i;
-  }
+	current_indices.resize(raw_cloud->size());
+	for (int i = 0; i < current_indices.size(); ++i)
+	{
+		current_indices[i] = i;
+	}
 
-  PCLInteractorCustom* style = PCLInteractorCustom::New(); 
-  pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(style));
-  viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
-  viewer->registerMouseCallback(mouseEventOccurred, (void*)&viewer);
-  viewer->addCoordinateSystem();
-  viewer->addPointCloud(cloud);
-  viewer->spin();
+	read_data();
+
+	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
+	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(style));
+	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
+	viewer->registerMouseCallback(mouseEventOccurred, (void*)&viewer);
+	viewer->addCoordinateSystem();
+	viewer->addPointCloud(cloud);
+	viewer->spin();
 }
