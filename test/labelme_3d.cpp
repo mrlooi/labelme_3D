@@ -750,7 +750,7 @@ int main(int argc, char *argv[])
 	read_data();
 
 	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
-	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(style));
+	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(argc, argv, style));
 	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
 	viewer->registerMouseCallback(mouseEventOccurred, (void*)&viewer);
 	viewer->addCoordinateSystem();
