@@ -18,7 +18,9 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 ## Commands
 ### PCL Viewer
 - Annotate: `a` (annotate points in a polygon - currently assigns a random, unique annotation color to the points)
+- Annotate - controlled: `Ctrl` + `a` (same as above, but does not override existing annotations inside the polygon)
 - Merge Annotation: `m` (annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action)
+- Merge Annotation - controlled: `Ctrl` + `m` (same as above, but does not override existing annotations inside the polygon)
 - Undo-Annotation: `u`  (converts points in the polygon back to their original colors)
 - Delete: `d`   (removes all points in the polygon)
 - Extract: `x`  (extracts all points in the polygon -> opposite of "delete")
