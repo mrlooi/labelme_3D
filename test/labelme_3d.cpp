@@ -212,6 +212,32 @@ void drawPoints(cv::Mat& img_out, const std::vector<cv::Point>& pts)
 }
 
 
+void print_help()
+{
+	printf(
+"\n===================HELP===================\n"
+"## Commands \n"
+"### PCL Viewer\n"
+"- Annotate: `a` (annotate points in a polygon - currently assigns a random, unique annotation color to the points)\n"
+"- Merge Annotation: `m` (annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action)\n"
+"- Undo-Annotation: `u`  (converts points in the polygon back to their original colors)\n"
+"- Delete: `d`   (removes all points in the polygon)\n"
+"- Extract: `x`  (extracts all points in the polygon -> opposite of 'delete')\n"
+"- Undo: `Ctrl + z`\n"
+"- Redo: `Ctrl + y`\n"
+"- Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file (**see below for reading the output json**) containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
+"- Quit: `Esc`  (quits the program)\n"
+"\n"
+"### OpenCV pop-up window\n"
+"- Draw a polygon point: `Left-click`\n"
+"- Undo previous polygon point: `backspace`\n"
+"- Clear: `c` (clears all existing polygon points)\n"
+"- Quit: `q`  (closes the pop-up window (but not the PCL viewer))\n"
+"===================  ===================\n\n"
+);
+
+}
+
 static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewer, Eigen::Matrix4f& view_pose)
 {
 	Eigen::Affine3f pose_af = viewer->getViewerPose();
@@ -513,6 +539,12 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 	bool refresh_cloud = false;
 	if (event.keyDown())
 	{
+		if (key == "h")
+		{
+			print_help();
+			return;
+		}
+
 		get_viewer_pose(viewer, viewer_pose);
 
 		bool is_ctrl = event.isCtrlPressed();
@@ -716,10 +748,6 @@ void read_data()
 	} 
 }
 
-void print_help()
-{
-	printf("Pressed ESC to quit pcl viewer\n");
-}
 
 int main(int argc, char *argv[])
 {
@@ -756,7 +784,7 @@ int main(int argc, char *argv[])
 	read_data();
 
 	print_help();
-	
+
 	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(argc, argv, style));
 	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
@@ -764,4 +792,6 @@ int main(int argc, char *argv[])
 	viewer->addCoordinateSystem();
 	viewer->addPointCloud(cloud);
 	viewer->spin();
+
+	return 0;
 }
