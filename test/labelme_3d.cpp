@@ -225,7 +225,7 @@ void print_help()
 "- Extract: `x`  (extracts all points in the polygon -> opposite of 'delete')\n"
 "- Undo: `Ctrl + z`\n"
 "- Redo: `Ctrl + y`\n"
-"- Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file (**see below for reading the output json**) containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
+"- Save: `Ctrl + s`  (saves a pcd_file containing the final pointcloud and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
 "- Quit: `Esc`  (quits the program)\n"
 "\n"
 "### OpenCV pop-up window\n"
