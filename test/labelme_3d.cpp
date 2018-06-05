@@ -66,22 +66,58 @@ std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
 
 
+bool check_color_exists(const Eigen::Vector3i& color)
+{
+	for (int i = 0; i < saved_colors.size(); ++i)  // there are obviously much faster ways to do this e.g. hash, too lazy
+	{
+		const auto& c = saved_colors[i];
+		if (color[0] == c[0] && color[1] == c[1] && color[2] == c[2])
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+int color_cloud_points(pcl::PointCloud<PointT>& cloud, const std::vector<int>& indices, const Eigen::Vector3i color, bool override_annots = true)
+{
+	// Eigen::Vector3f color {float(colori[0])/255, float(colori[1])/255, float(colori[2])/255};
+	int colored_cnt = indices.size();
+	if (override_annots)
+	{
+		for (int i = 0; i < indices.size(); ++i)
+		{
+			PointT& pt = cloud.points[indices[i]];
+			pt.b = color[0];
+			pt.g = color[1];
+			pt.r = color[2];	
+		}
+	} else {
+		colored_cnt = 0;
+		for (int i = 0; i < indices.size(); ++i)
+		{
+			PointT& pt = cloud.points[indices[i]];
+			Eigen::Vector3i pt_color {pt.b, pt.g, pt.r};
+			if (!check_color_exists(pt_color))
+			{
+				pt.b = color[0];
+				pt.g = color[1];
+				pt.r = color[2];
+				++colored_cnt;
+			}
+		}
+	}
+
+	return colored_cnt;
+}
+
 Eigen::Vector3i generate_random_color()
 {
 	Eigen::Vector3i color;
 	while (true)
 	{
 		color = PclViewerUtils::get_random_color();
-		bool is_used = false;
-		for (int i = 0; i < saved_colors.size(); ++i)  // there are obviously much faster ways to do this e.g. hash, too lazy
-		{
-			const auto& c = saved_colors[i];
-			if (color[0] == c[0] && color[1] == c[1] && color[2] == c[2])
-			{
-				is_used = true;
-				break;
-			}
-		}
+		bool is_used = check_color_exists(color);
 		if (!is_used)
 			break;
 		// int hash = color[0] + color[1] << 1 + color[2] << 2;
@@ -550,6 +586,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		bool is_ctrl = event.isCtrlPressed();
 		if (key == "a" || key == "u" || key == "d" || key == "x" || key == "m")
 		{
+			printf("[Ctrl] pressed\n");
 			if (key == "a")
 			{
 				printf("Operation: ANNOTATE\n");
@@ -611,8 +648,10 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 					color = anchor_color;
 					anchor_color = {-1,-1,-1}; // reset
 				}
-				PclViewerUtils::color_cloud_points(*cloud, cloud_indices, color);
-				printf("Annotated %d points with color: %d %d %d\n", cloud_indices.size(), color[0], color[1], color[2]);
+
+				bool override_annots = !is_ctrl;
+				int colored_cnt = color_cloud_points(*cloud, cloud_indices, color, override_annots); // if control is pressed, don't override previous annotations
+				printf("Annotated %d points with color: %d %d %d\n", colored_cnt, color[0], color[1], color[2]);
 			} else {
 				auto& pts = cloud->points;
 				if (key == "d")
@@ -763,6 +802,7 @@ int main(int argc, char *argv[])
 		std::cout << "Cloud reading failed." << std::endl;
 		return (-1);
 	}
+	print_help();
 
 	pcl::console::parse (argc, argv, "-ores", octree_resolution);
 	pcl::console::parse (argc, argv, "-width", img_width);
@@ -783,7 +823,6 @@ int main(int argc, char *argv[])
 
 	read_data();
 
-	print_help();
 
 	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(argc, argv, style));
