@@ -25,7 +25,7 @@ In the OpenCV window, use `left-click` to draw polygon points, `backspace` to un
 - Undo: `Ctrl + z`
 - Redo: `Ctrl + y`
 - Save: `Ctrl + s`  (saves the final pointcloud to a pcd_file and a json_file (**see below for reading the output json**) containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)
-- Quit: `q`  (quits the program)
+- Quit: `Esc`  (quits the program)
 
 ### OpenCV pop-up window
 - Draw a polygon point: `Left-click`
