@@ -84,10 +84,14 @@ void PCLInteractorCustom::OnKeyDown ()
 
 	switch (Interactor->GetKeyCode ())
 	{
-		case 'q': case 'Q':
+		case 27: // ESC
 		{
 		  Interactor->ExitCallback ();
 		  return;
+		}
+		case 'q': case 'Q': case 'e': case 'E':
+		{
+			break;
 		}
 		default:
 		{
@@ -116,6 +120,10 @@ void PCLInteractorCustom::OnChar ()
 
 	switch (Interactor->GetKeyCode ())
 	{	
+		case 'q': case 'Q': case 'e': case 'E':
+		{
+			break;
+		}
 	    default:
 	    {
 			Superclass::OnChar ();

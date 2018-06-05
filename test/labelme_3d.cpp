@@ -716,6 +716,11 @@ void read_data()
 	} 
 }
 
+void print_help()
+{
+	printf("Pressed ESC to quit pcl viewer\n");
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc <= 1)
@@ -739,6 +744,7 @@ int main(int argc, char *argv[])
 	pcl::console::parse (argc, argv, "-ij", in_json_file);
 	pcl::console::parse (argc, argv, "-oj", out_json_file);
 
+
 	*cloud += *raw_cloud;
 
 	current_indices.resize(raw_cloud->size());
@@ -749,6 +755,8 @@ int main(int argc, char *argv[])
 
 	read_data();
 
+	print_help();
+	
 	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
 	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(argc, argv, style));
 	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
