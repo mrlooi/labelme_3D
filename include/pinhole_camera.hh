@@ -5,7 +5,7 @@
 
 #include <pcl/common/transforms.h>
 #include <pcl/octree/octree_search.h>  // for occlusion detection
-#include <pcl/surface/texture_mapping.h>  // for occlusion detection
+// #include <pcl/surface/texture_mapping.h>  // for occlusion detection
 
 /* 
 You need first 3 parameters that define your camera: the focal length f, and the center of the projection plane: cx, cy. With this you create a 3x3 matrix (I will use matlab syntax):
@@ -35,9 +35,11 @@ x = S(1, i) / S(3, i);
 y = S(2, i) / S(3, i);
 */
 
+
 template <typename PointT>
 class PinholeCamera
 {
+	typedef typename pcl::PCLBase<PointT>::PointCloud PointCloud;
 	typedef typename pcl::PCLBase<PointT>::PointCloudConstPtr PointCloudConstPtr;
 	typedef typename pcl::octree::OctreePointCloudSearch<PointT> Octree;
 	typedef typename Octree::Ptr OctreePtr;
@@ -51,6 +53,51 @@ public:
 		cy_ = cy;
 
 		set_camera_pose(camera_pose);
+	}
+
+
+	bool isPointOccluded (const PointT &pt, OctreePtr octree, double dist_thresh = 0)
+	{
+	  Eigen::Vector3f direction;
+	  direction (0) = pt.x;
+	  direction (1) = pt.y;
+	  direction (2) = pt.z;
+
+	  std::vector<int> indices;
+
+	  PointCloudConstPtr cloud (new PointCloud());
+	  cloud = octree->getInputCloud();
+
+	  double distance_threshold = octree->getResolution();
+	  if (dist_thresh > 0)
+	  {
+	  	distance_threshold = dist_thresh;
+	  }
+
+	  // raytrace
+	  octree->getIntersectedVoxelIndices(direction, -direction, indices);
+
+	  int nbocc = static_cast<int> (indices.size ());
+	  for (size_t j = 0; j < indices.size (); j++)
+	  {
+	   // if intersected point is on the over side of the camera
+	   if (pt.z * cloud->points[indices[j]].z < 0)
+	   {
+	     nbocc--;
+	     continue;
+	   }
+
+	   if (std::fabs (cloud->points[indices[j]].z - pt.z) <= distance_threshold)
+	   {
+	     // points are very close to each-other, we do not consider the occlusion
+	     nbocc--;
+	   }
+	  }
+
+	  if (nbocc == 0)
+	   return (false);
+	  else
+	   return (true);
 	}
 
 	// setter methods
@@ -340,7 +387,7 @@ public:
 		}
 	}
 
-	void project_non_occluded_surface(cv::Mat& proj_img, std::vector<std::vector<std::vector<int>>>& uv_idx_map, float octree_resolution=0.02)
+	void project_non_occluded_surface(cv::Mat& proj_img, std::vector<std::vector<std::vector<int>>>& uv_idx_map, float octree_resolution=0.02, float dist_threshold = 0)
 	{
 		if (!has_cloud)
 		{
@@ -386,7 +433,7 @@ public:
 			if (!pt_has_nan(pt))
 			{
 				// check occlusion
-				bool is_occ = tm_.isPointOccluded(rot_cloud->points[i], octree);
+				bool is_occ = isPointOccluded(rot_cloud->points[i], octree, dist_threshold);
 				if (!is_occ)
 				{
 					uv_idx_map[y][x].push_back(i);
@@ -462,7 +509,7 @@ private:
 	bool has_cloud = false;
 
 	// algorithms
-	typename pcl::TextureMapping<PointT> tm_;
+	// typename pcl::TextureMapping<PointT> tm_;
 };
 
 #endif

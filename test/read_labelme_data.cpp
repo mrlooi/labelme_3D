@@ -1,6 +1,8 @@
 #include <iostream>
 
 #include <pcl/io/pcd_io.h>
+#include <pcl/console/parse.h>
+
 #include <pcl/visualization/cloud_viewer.h>
 
 #include <opencv2/opencv.hpp>
@@ -31,6 +33,10 @@ int main(int argc, char *argv[])
   pcd_file = argv[1];
   json_file = argv[2];
 
+  int morph_kernel_size = 9;
+  float octree_resolution = 0.015;
+  pcl::console::parse (argc, argv, "-ores", octree_resolution);
+  pcl::console::parse (argc, argv, "-morph", morph_kernel_size);
 
   pcl::PointCloud<PointT>::Ptr raw_cloud (new pcl::PointCloud<PointT>);
   pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>); // same as annotated cloud, but with original raw cloud colors
@@ -48,6 +54,8 @@ int main(int argc, char *argv[])
     std::cout << "Failed to read " << json_file << std::endl;
     return -1;
   }
+  std::string poses_json_file = "../data/poses.json";
+  rt = labelme::read_data(poses_json_file, l_data);
 
   cloud->resize(l_data.data.size());
   annotated_cloud->resize(l_data.data.size());
@@ -99,7 +107,8 @@ int main(int argc, char *argv[])
     pinhole_cam.project(proj_img, uv_idx_map);
 
     pinhole_cam.set_input_cloud(annotated_cloud);
-    pinhole_cam.project(proj_img2, uv_idx_map);
+    // pinhole_cam.project(proj_img2, uv_idx_map);
+    pinhole_cam.project_non_occluded_surface(proj_img2, uv_idx_map, octree_resolution, octree_resolution * 4);
 
     cv::imshow("img", proj_img);
     cv::imshow("img2", proj_img2);
@@ -111,19 +120,20 @@ int main(int argc, char *argv[])
       cv::Mat mask = cv::Mat::zeros(proj_img2.size(), CV_8UC1);   
       for (int x = 0; x < proj_img2.cols; ++x)
       {
-       for (int y = 0; y < proj_img2.rows; ++y)
-       {
+        for (int y = 0; y < proj_img2.rows; ++y)
+        {
           const auto& px = proj_img2.at<cv::Vec3b>(y,x);
           if (px[0] == color[0] && px[1] == color[1] && px[2] == color[2])
           {
             mask.at<uchar>(y,x) = 255;
           }
-       }
+        }
       }
+      cv::imshow("mask", mask);
 
       // close holes arising from sparse points 
       cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT,
-                  cv::Size(13, 13));
+                  cv::Size(morph_kernel_size, morph_kernel_size));
       cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
 
       std::vector<cv::Vec4i> hierarchy;
@@ -140,7 +150,26 @@ int main(int argc, char *argv[])
       // cv::Mat proj_img_copy = proj_img.clone();
       cv::drawContours(proj_img, out_contours, 0, {color[0], color[1], color[2]}, 2, 8);
 
-      // cv::imshow("mask", mask);
+      // cv::imshow("morph", mask);
+      // cv::imshow("contours", proj_img);
+      // cv::waitKey(0);
+      double arclen = cv::arcLength(cv::Mat(biggest_contour), true);
+      double eps = 0.005;
+      double epsilon = arclen * eps;
+      std::vector<cv::Point> approx_out;
+      cv::approxPolyDP(biggest_contour, approx_out, epsilon, true);
+      if (approx_out.size() > 0)
+      {
+        cv::putText(proj_img, std::to_string(i), approx_out[0], cv::FONT_HERSHEY_SCRIPT_SIMPLEX, 1, cv::Scalar(color[0], color[1], color[2]), 1, 8);
+        // printf("%d) [", i);
+        for (const auto& apt: approx_out)
+        {
+          cv::circle(proj_img, apt, 3, cv::Scalar(0,255,0), 1, 8, 0);
+          // printf("[%d,%d],", apt.x, apt.y);
+        }
+        // printf("]\n");
+      }
+
     }
     cv::imshow("contours", proj_img);
     cv::waitKey(0);

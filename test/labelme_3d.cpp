@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <unordered_map>  
-// #include <stack>
+#include <algorithm>
+
 
 #include <future>         // std::async, std::future
 
@@ -66,8 +67,6 @@ struct OpData {
 
 std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
-
-
 
 bool check_color_exists(const Eigen::Vector3i& color)
 {
@@ -237,7 +236,7 @@ void project()
 
 	// pinhole_cam.project_surface(proj_img, uv_idx_map, 0.03);
 	pinhole_cam.project(proj_img, uv_idx_map);
-	// pinhole_cam.project_non_occluded_surface(proj_img, uv_idx_map, octree_resolution);
+	// pinhole_cam.project_non_occluded_surface(proj_img, uv_idx_map, octree_resolution, octree_resolution * 4);
 	proj_img_copy = proj_img.clone();
 
 }
@@ -460,7 +459,7 @@ void trigger_cv_window()
 		}
 	}
 
-	cv::destroyWindow("My Window");
+	// cv::destroyWindow("My Window");
 }
 
 
@@ -587,11 +586,17 @@ void add_current_cloud_to_stack()
 	redo_data.clear();
 }
 
+inline void to_lower_case(std::string& s)
+{
+	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+}
+
 void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer_void)
 {
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
 
 	std::string key = event.getKeySym();
+	to_lower_case(key);
 
 	bool refresh_cloud = false;
 	if (event.keyDown())
@@ -754,6 +759,10 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			viewer->removeAllPointClouds();
 			viewer->addPointCloud(cloud);
 			// save_data(); // auto save
+
+			project();
+			cv::imshow("My Window", proj_img);
+			cv::waitKey(10);
 			do {
 				viewer->spinOnce(20);
 				fut_status = fut.wait_for(std::chrono::milliseconds(20));
@@ -812,11 +821,11 @@ void read_data()
 			pt.r = d[3];
 			cloud->points[i] = pt;
 
-			Eigen::Vector3i color {pt.b, pt.g, pt.r};
-			if (check_color_exists(color))
-			{
-				// point_color_map[i] = color;
-			}
+			// Eigen::Vector3i color {pt.b, pt.g, pt.r};
+			// if (check_color_exists(color))
+			// {
+			// 	// point_color_map[i] = color;
+			// }
 		}
 
 		printf("Loaded data from %s\n", in_json_file.c_str());
