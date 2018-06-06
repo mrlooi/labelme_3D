@@ -1,7 +1,9 @@
 #include <iostream>
 #include <fstream>
-// #include <unordered_map>  
+#include <unordered_map>  
 // #include <stack>
+
+#include <future>         // std::async, std::future
 
 #include <pcl/io/pcd_io.h>
 
@@ -55,7 +57,7 @@ Eigen::Vector3i anchor_color {-1,-1,-1};
 std::vector<int> current_indices;
 
 std::vector<Eigen::Vector3i> saved_colors;
-// std::unordered_map<int> color_hash_map;
+std::unordered_map<int, Eigen::Vector3i> point_color_map;
 
 struct OpData {
 	pcl::PointCloud<PointT>::Ptr cloud;
@@ -64,6 +66,7 @@ struct OpData {
 
 std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
+
 
 
 bool check_color_exists(const Eigen::Vector3i& color)
@@ -79,10 +82,33 @@ bool check_color_exists(const Eigen::Vector3i& color)
 	return false;
 }
 
+bool check_pt_color_exists(const PointT& pt)
+{
+	Eigen::Vector3i color {pt.b, pt.g, pt.r};
+	return check_color_exists(color);
+}
+
+bool is_pt_annotated(int pt_idx)
+{
+	if (point_color_map.find(pt_idx) == point_color_map.end())
+		return false;
+	return true;
+}
+
+void annotate_pt(int pt_idx, const Eigen::Vector3i& color)
+{
+	assert (pt_idx < cloud->size());
+	PointT& pt = cloud->points[pt_idx];
+	pt.b = color[0];
+	pt.g = color[1];
+	pt.r = color[2];
+	point_color_map[pt_idx] = color;
+}
+
 int color_cloud_points(pcl::PointCloud<PointT>& cloud, const std::vector<int>& indices, const Eigen::Vector3i color, bool override_annots = true)
 {
 	// Eigen::Vector3f color {float(colori[0])/255, float(colori[1])/255, float(colori[2])/255};
-	int colored_cnt = indices.size();
+	int colored_cnt = 0;
 	if (override_annots)
 	{
 		for (int i = 0; i < indices.size(); ++i)
@@ -92,17 +118,14 @@ int color_cloud_points(pcl::PointCloud<PointT>& cloud, const std::vector<int>& i
 			pt.g = color[1];
 			pt.r = color[2];	
 		}
+		colored_cnt = indices.size();
 	} else {
-		colored_cnt = 0;
 		for (int i = 0; i < indices.size(); ++i)
 		{
-			PointT& pt = cloud.points[indices[i]];
-			Eigen::Vector3i pt_color {pt.b, pt.g, pt.r};
-			if (!check_color_exists(pt_color))
+			int pt_idx = indices[i];
+			if (!is_pt_annotated(pt_idx))
 			{
-				pt.b = color[0];
-				pt.g = color[1];
-				pt.r = color[2];
+				annotate_pt(pt_idx, color);
 				++colored_cnt;
 			}
 		}
@@ -527,8 +550,10 @@ pcl::PointCloud<PointT>::Ptr extract_cloud(pcl::PointCloud<PointT>::Ptr cloud, s
 	return extract_cloud(cloud, indices_ptr, negative);
 }
 
-void save_data()
+bool save_data()
 {
+	printf("Saving data...\n");
+
 	labelme::LabelMeData l_data;
 
 	l_data.pcd_file = pcd_file;
@@ -552,6 +577,8 @@ void save_data()
 	} else {
 		printf("FAILED to open %s\n", out_json_file.c_str());
 	}
+
+	return rt;
 }
 
 void add_current_cloud_to_stack()
@@ -677,6 +704,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 						int ix = cloud_indices[i];
 						int parent_ix = current_indices[ix];
 						cloud->points[ix] = raw_cloud->points[parent_ix];
+						point_color_map.erase(ix);
 					}
 					printf("Undo annotation for %d points\n", cloud_indices.size());
 				}
@@ -690,8 +718,6 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			img_pts.clear();
 
 			refresh_cloud = true;
-
-			save_data(); // auto save
 
 		} 
 		if (is_ctrl)
@@ -726,10 +752,20 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			}
 		}
 
-		if (refresh_cloud)
+		if (refresh_cloud)	
 		{
+			std::future<bool> fut = std::async (std::launch::async, save_data); // auto save
+			std::future_status fut_status; 
+
 			viewer->removeAllPointClouds();
 			viewer->addPointCloud(cloud);
+			// save_data(); // auto save
+			do {
+				viewer->spinOnce(20);
+				fut_status = fut.wait_for(std::chrono::milliseconds(20));
+				// printf("FUT wait %d\n", fut_status);
+			} while (fut_status != std::future_status::ready);
+			fut.get();
 			viewer->spin();
 		}
 	}
@@ -781,6 +817,12 @@ void read_data()
 			pt.g = d[2];
 			pt.r = d[3];
 			cloud->points[i] = pt;
+
+			Eigen::Vector3i color {pt.b, pt.g, pt.r};
+			if (check_color_exists(color))
+			{
+				point_color_map[i] = color;
+			}
 		}
 
 		printf("Loaded data from %s\n", in_json_file.c_str());
