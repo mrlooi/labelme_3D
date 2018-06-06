@@ -57,7 +57,7 @@ Eigen::Vector3i anchor_color {-1,-1,-1};
 std::vector<int> current_indices;
 
 std::vector<Eigen::Vector3i> saved_colors;
-std::unordered_map<int, Eigen::Vector3i> point_color_map;
+// std::unordered_map<int, Eigen::Vector3i> point_color_map;
 
 struct OpData {
 	pcl::PointCloud<PointT>::Ptr cloud;
@@ -88,21 +88,14 @@ bool check_pt_color_exists(const PointT& pt)
 	return check_color_exists(color);
 }
 
-bool is_pt_annotated(int pt_idx)
+void annotate_pt(PointT& pt, const Eigen::Vector3i& color)
 {
-	if (point_color_map.find(pt_idx) == point_color_map.end())
-		return false;
-	return true;
-}
-
-void annotate_pt(int pt_idx, const Eigen::Vector3i& color)
-{
-	assert (pt_idx < cloud->size());
-	PointT& pt = cloud->points[pt_idx];
+	// assert (pt_idx < cloud->size());
+	// PointT& pt = cloud->points[pt_idx];
 	pt.b = color[0];
 	pt.g = color[1];
 	pt.r = color[2];
-	point_color_map[pt_idx] = color;
+	// point_color_map[pt_idx] = color;
 }
 
 int color_cloud_points(pcl::PointCloud<PointT>& cloud, const std::vector<int>& indices, const Eigen::Vector3i color, bool override_annots = true)
@@ -123,9 +116,10 @@ int color_cloud_points(pcl::PointCloud<PointT>& cloud, const std::vector<int>& i
 		for (int i = 0; i < indices.size(); ++i)
 		{
 			int pt_idx = indices[i];
-			if (!is_pt_annotated(pt_idx))
+			PointT& pt = cloud.points[pt_idx];
+			if (!check_pt_color_exists(pt))
 			{
-				annotate_pt(pt_idx, color);
+				annotate_pt(pt, color);
 				++colored_cnt;
 			}
 		}
@@ -704,7 +698,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 						int ix = cloud_indices[i];
 						int parent_ix = current_indices[ix];
 						cloud->points[ix] = raw_cloud->points[parent_ix];
-						point_color_map.erase(ix);
+						// point_color_map.erase(ix);
 					}
 					printf("Undo annotation for %d points\n", cloud_indices.size());
 				}
@@ -821,7 +815,7 @@ void read_data()
 			Eigen::Vector3i color {pt.b, pt.g, pt.r};
 			if (check_color_exists(color))
 			{
-				point_color_map[i] = color;
+				// point_color_map[i] = color;
 			}
 		}
 
