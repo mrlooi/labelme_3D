@@ -81,6 +81,9 @@ struct OpData {
 std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
 
+
+static int cv_window_cnt = 0;
+
 bool check_color_exists(const Eigen::Vector3i& color)
 {
 	for (int i = 0; i < saved_colors.size(); ++i)  // there are obviously much faster ways to do this e.g. hash, too lazy
@@ -243,7 +246,6 @@ void project()
 	pinhole_cam.set_image_height(img_height);
 
 	pinhole_cam.set_camera_pose(viewer_pose);
-	std::cout << "Projecting with camera pose: " << viewer_pose << std::endl;
 
 	pinhole_cam.set_input_cloud(cloud);
 
@@ -277,26 +279,20 @@ void drawPoints(cv::Mat& img_out, const std::vector<cv::Point>& pts)
 }
 
 
-void print_help()
+void print_pcl_help()
 {
 	printf(
-"\n===================HELP===================\n"
+"\n===================PCL HELP===================\n"
 "## Commands \n"
 "### PCL Viewer\n"
 "- OpenCV Pop-up window: `a`\n"
+"- Print current viewer pose: `p`\n"
 "- Undo: `Ctrl + z`\n"
 "- Redo: `Ctrl + y`\n"
 "- Save: `Ctrl + s`  (saves a pcd_file containing the final pointcloud and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
 "- Quit: `Esc`  (quits the program)\n"
-"\n"
-"### OpenCV pop-up window\n"
-"- Draw a polygon point: `Left-click`\n"
-"- Undo previous polygon point: `backspace`\n"
-"- Clear: `c` (clears all existing polygon points)\n"
-"- Quit: `q`  (closes the pop-up window (but not the PCL viewer))\n"
 "===================  ===================\n\n"
 );
-
 }
 
 static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewer, Eigen::Matrix4f& view_pose)
@@ -571,8 +567,36 @@ bool get_anchor_color(const cv::Point& anchor_pt)
 	return true;
 }
 
+void print_opencv_help()
+{
+	printf(
+		"\n===================OPENCV WINDOW HELP===================\n"
+		"### COMMANDS\n"
+		"- Draw a polygon point: `Left-click`\n"
+		"- Undo previous polygon point: `backspace`\n"
+		"- Clear: `c` (clears all existing polygon points)\n"
+		"- Perform action: `ENTER`\n"
+		"- Quit: `q`  (closes the pop-up window (but not the PCL viewer))\n"
+		"### ACTIONS\n"
+		"- Annotate: annotate points in a polygon - currently assigns a random, unique annotation color to the points\n"
+		"- Ctrl Annotate:  same as above, but does not override existing annotations inside the polygon\n"
+		"- Merge: annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action\n"
+		"- Ctrl Merge:  same as above, but does not override existing annotations inside the polygon\n"
+		"- Undo-Annotation:  converts points in the polygon back to their original colors\n"
+		"- Delete:   removes all points in the polygon\n"
+		"- Extract:  extracts all points in the polygon -> opposite of 'delete'\n"
+		"\n===================OPENCV WINDOW HELP===================\n"
+	);
+}
+
 void trigger_cv_window()
 {
+	if (cv_window_cnt == 0)
+	{
+		print_opencv_help();
+	}
+	++cv_window_cnt;
+
 	// cv::flip(proj_img, proj_img, -1); // rotate by 180
 	project();
 	//Create a window
@@ -607,7 +631,7 @@ void trigger_cv_window()
 
         bool undo_flag = false, redo_flag = false;
 
-        cvui::window(proj_img_copy, mode_window_rect.x, mode_window_rect.y, mode_window_rect.width, mode_window_rect.height, "Mode");
+        cvui::window(proj_img_copy, mode_window_rect.x, mode_window_rect.y, mode_window_rect.width, mode_window_rect.height, "Action");
         cvui::checkbox(proj_img_copy, 15, 80, "Annotate", &a_mode);
         cvui::checkbox(proj_img_copy, 100, 80, "Ctrl Annotate", &ca_mode);
         cvui::checkbox(proj_img_copy, 15, 160, "Merge", &m_mode);
@@ -615,11 +639,12 @@ void trigger_cv_window()
         cvui::checkbox(proj_img_copy, 15, 120, "Delete", &d_mode);
         cvui::checkbox(proj_img_copy, 15, 180, "UndoAnnotation", &u_mode);
 
-        cvui::printf(proj_img_copy, 15, 200, 0.4, 0x000000, "Revert");
-        cvui::checkbox(proj_img_copy, 15, 240, "Undo", &undo_flag);
-        cvui::checkbox(proj_img_copy, 80, 240, "Redo", &redo_flag);
+        // cvui::printf(proj_img_copy, 15, 200, 0.4, 0x000000, "Revert");
+        cvui::checkbox(proj_img_copy, 15, 220, "Undo", &undo_flag);
+        cvui::checkbox(proj_img_copy, 80, 220, "Redo", &redo_flag);
 
-        cvui::printf(proj_img_copy, 15, 260, 0.4, 0xff0000, "Undo size: %d, Redo size: %d", undo_data.size(), redo_data.size());
+        cvui::printf(proj_img_copy, 15, 240, 0.4, 0xff0000, "Undo size: %d, Redo size: %d", undo_data.size(), redo_data.size());
+        cvui::printf(proj_img_copy, 15, 260, 0.4, 0xff0000, "Annotation colors: %d", saved_colors.size());
 
 		cv::imshow("My Window", proj_img_copy);
         cvui::update();
@@ -708,15 +733,7 @@ void trigger_cv_window()
 		
 		if (key == 'h')
 		{
-			printf(
-				"- Annotate: annotate points in a polygon - currently assigns a random, unique annotation color to the points\n"
-				"- Ctrl Annotate:  same as above, but does not override existing annotations inside the polygon\n"
-				"- Merge: annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action\n"
-				"- Ctrl Merge:  same as above, but does not override existing annotations inside the polygon\n"
-				"- Undo-Annotation: `u`  converts points in the polygon back to their original colors\n"
-				"- Delete: `d`   removes all points in the polygon\n"
-				"- Extract: `x`  extracts all points in the polygon -> opposite of 'delete'\n"
-				);
+			print_opencv_help();
 			continue;
 		}
 		else if (key == 'c') // backspace
@@ -781,11 +798,18 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 	{
 		if (key == "h")
 		{
-			print_help();
+			print_pcl_help();
 			return;
 		}
 
 		get_viewer_pose(viewer, viewer_pose);
+
+		if (key == "p")
+		{
+			std::cout << "Showing viewer pose...\n";
+			std::cout << viewer_pose << std::endl;
+			return;
+		}
 
 		bool is_ctrl = event.isCtrlPressed();
 		if (key == "a")
@@ -915,7 +939,7 @@ int main(int argc, char *argv[])
 		std::cout << "Cloud reading failed." << std::endl;
 		return (-1);
 	}
-	print_help();
+	print_pcl_help();
 
 	pcl::console::parse (argc, argv, "-ores", octree_resolution);
 	pcl::console::parse (argc, argv, "-width", img_width);
