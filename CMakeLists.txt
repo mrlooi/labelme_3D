@@ -34,3 +34,9 @@ target_link_libraries (pcl_viewer_test ${PCL_LIBRARIES})
 
 add_executable (read_labelme_data ../test/read_labelme_data.cpp ../src/labelme_io.cc)
 target_link_libraries (read_labelme_data ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+add_executable (cvui_test ../test/cvui_test.cpp)
+target_link_libraries (cvui_test ${OpenCV_LIBS})
+
+add_executable (labelme_3d2 ../test/labelme_3d2.cpp ../src/pcl_viewer_custom.cc ../src/labelme_io.cc)
+target_link_libraries (labelme_3d2 ${PCL_LIBRARIES} ${OpenCV_LIBS} "-lpthread")
