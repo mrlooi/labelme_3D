@@ -283,11 +283,7 @@ void print_help()
 "\n===================HELP===================\n"
 "## Commands \n"
 "### PCL Viewer\n"
-"- Annotate: `a` (annotate points in a polygon - currently assigns a random, unique annotation color to the points)\n"
-"- Merge Annotation: `m` (annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action)\n"
-"- Undo-Annotation: `u`  (converts points in the polygon back to their original colors)\n"
-"- Delete: `d`   (removes all points in the polygon)\n"
-"- Extract: `x`  (extracts all points in the polygon -> opposite of 'delete')\n"
+"- OpenCV Pop-up window: `a`\n"
 "- Undo: `Ctrl + z`\n"
 "- Redo: `Ctrl + y`\n"
 "- Save: `Ctrl + s`  (saves a pcd_file containing the final pointcloud and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
@@ -519,7 +515,7 @@ void process(std::string key, bool is_ctrl=false)
 	}
 	img_pts.clear();
 
-	refresh_cloud_func(false, true);
+	refresh_cloud_func(true, true);
 }
 
 bool get_anchor_color(const cv::Point& anchor_pt)
@@ -710,7 +706,20 @@ void trigger_cv_window()
             }
         }
 		
-		if (key == 'c') // backspace
+		if (key == 'h')
+		{
+			printf(
+				"- Annotate: annotate points in a polygon - currently assigns a random, unique annotation color to the points\n"
+				"- Ctrl Annotate:  same as above, but does not override existing annotations inside the polygon\n"
+				"- Merge: annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action\n"
+				"- Ctrl Merge:  same as above, but does not override existing annotations inside the polygon\n"
+				"- Undo-Annotation: `u`  converts points in the polygon back to their original colors\n"
+				"- Delete: `d`   removes all points in the polygon\n"
+				"- Extract: `x`  extracts all points in the polygon -> opposite of 'delete'\n"
+				);
+			continue;
+		}
+		else if (key == 'c') // backspace
 		{
 			cout << "C PRESSED\n";
 			img_pts.clear();
@@ -727,7 +736,7 @@ void trigger_cv_window()
 			proj_img_copy = proj_img.clone();
 			drawPoints(proj_img_copy, img_pts);
 		}
-		else if (key == 13) // enter
+		else if (key == 13 || key == 10) // enter
 		{
 			cout << "ENTER PRESSED\n";
 			std::string key = "a";
@@ -752,6 +761,7 @@ void trigger_cv_window()
 		}
 		else if (key == 'q')
 		{
+			img_pts.clear();
 			cv::destroyWindow("My Window");
 			break;
 		}
@@ -782,6 +792,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 		{
 			// project();
 			trigger_cv_window();			
+			// refresh_cloud_func();
 			viewer->spin();
 			// refresh_cloud = true;
 		} 
@@ -805,15 +816,21 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			}
 			else if (key == "z")
 			{
-				printf("Ctrl+z PRESSED\n");		
-				undo();
-				refresh_cloud = true;
+				printf("UNDO\n");		
+				if (undo_data.size() > 0)
+				{
+					undo();
+					refresh_cloud = true;
+				}
 			}
 			else if (key == "y")
 			{
-				printf("Ctrl+y PRESSED\n");		
-				redo();
-				refresh_cloud = true;
+				printf("REDO\n");
+				if (redo_data.size() > 0)
+				{
+					redo();
+					refresh_cloud = true;
+				}
 			}
 		}
 
