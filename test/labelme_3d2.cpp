@@ -706,7 +706,7 @@ void trigger_cv_window()
 
 		char key = (char) cv::waitKey(10);
 
-        if (cvui::mouse(cvui::DOWN)) 
+        if (cvui::mouse(cvui::CLICK)) 
         {
             // Position the rectangle at the mouse pointer.
             cv::Point pt;
