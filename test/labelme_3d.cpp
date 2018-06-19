@@ -34,7 +34,7 @@
 
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
 
-typedef pcl::PointXYZRGBA PointT;
+typedef pcl::PointXYZRGB PointT;
 typedef Eigen::Array<bool,Eigen::Dynamic,1> ArrayXb;
 
 
@@ -604,7 +604,7 @@ void trigger_cv_window()
 
     cvui::init("My Window");
 
-    ArrayXb modes = ArrayXb::Constant(6,false);
+    ArrayXb modes = ArrayXb::Constant(7,false);
 
     bool& ANNOTATE = modes(0);
     bool& DELETE = modes(1);
@@ -612,6 +612,7 @@ void trigger_cv_window()
     bool& UNDO = modes(3);
     bool& CTRL_ANNOTATE = modes(4);
     bool& CTRL_MERGE = modes(5);
+    bool& EXTRACT = modes(6);
 
     ANNOTATE = true;
 
@@ -624,6 +625,7 @@ void trigger_cv_window()
         bool a_mode = ANNOTATE;
         bool d_mode = DELETE;
         bool m_mode = MERGE;
+        bool x_mode = EXTRACT;
         bool u_mode = UNDO;
         bool ca_mode = CTRL_ANNOTATE;
         bool cm_mode = CTRL_MERGE;
@@ -637,6 +639,7 @@ void trigger_cv_window()
         cvui::checkbox(proj_img_copy, 15, 160, "Merge", &m_mode);
         cvui::checkbox(proj_img_copy, 100, 160, "Ctrl Merge", &cm_mode);
         cvui::checkbox(proj_img_copy, 15, 120, "Delete", &d_mode);
+        cvui::checkbox(proj_img_copy, 100, 120, "Extract", &x_mode);
         cvui::checkbox(proj_img_copy, 15, 180, "UndoAnnotation", &u_mode);
 
         // cvui::printf(proj_img_copy, 15, 200, 0.4, 0x000000, "Revert");
@@ -669,38 +672,44 @@ void trigger_cv_window()
             continue;
         } else if (a_mode && !ANNOTATE)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             ANNOTATE = true;
             continue;
         }
         else if (d_mode && !DELETE)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             DELETE = true;
             continue;
         }
         else if (m_mode && !MERGE)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             MERGE = true;
             continue;
         }
         else if (u_mode && !UNDO)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             UNDO = true;
             continue;
         }
         else if (ca_mode && !CTRL_ANNOTATE)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             CTRL_ANNOTATE = true;
             continue;
         }
         else if (cm_mode && !CTRL_MERGE)
         {
-            modes = ArrayXb::Constant(6,false);
+            modes = ArrayXb::Constant(7,false);
             CTRL_MERGE = true;
+            continue;
+        }
+        else if (x_mode && !EXTRACT)
+        {
+            modes = ArrayXb::Constant(7,false);
+            EXTRACT = true;
             continue;
         }
 
@@ -764,6 +773,8 @@ void trigger_cv_window()
 				key = "m";
 			else if (UNDO)
 				key = "u";
+			else if (EXTRACT)
+				key = "x";
 			else if (CTRL_ANNOTATE)
 			{
 				is_ctrl = true;
