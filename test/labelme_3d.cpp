@@ -1,3 +1,10 @@
+/*
+ A tool for labelling 3D pointclouds
+
+ Copyright (c) 2018 Shi Looi <vincent.sj.looi@gmail.com>
+ Licensed under the MIT license.
+*/
+
 #include <iostream>
 #include <fstream>
 #include <unordered_map>  
@@ -14,6 +21,10 @@
 
 #include <opencv2/opencv.hpp>
 
+
+#define CVUI_IMPLEMENTATION
+#include "cvui.h"
+
 #include "pinhole_camera.hh"
 #include "pcl_viewer_custom.hh"
 #include "pcl_viewer_utils.hh"
@@ -24,6 +35,7 @@
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
 
 typedef pcl::PointXYZRGBA PointT;
+typedef Eigen::Array<bool,Eigen::Dynamic,1> ArrayXb;
 
 
 const cv::Scalar RED {0,0,255};
@@ -36,6 +48,7 @@ int img_width = 960;
 int img_height = 960;
 int focal = 800;
 
+pcl::visualization::PCLVisualizer::Ptr viewer;
 
 pcl::PointCloud<PointT>::Ptr raw_cloud (new pcl::PointCloud<PointT>);
 pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>);
@@ -67,6 +80,9 @@ struct OpData {
 
 std::vector<OpData> undo_data;
 std::vector<OpData> redo_data;
+
+
+static int cv_window_cnt = 0;
 
 bool check_color_exists(const Eigen::Vector3i& color)
 {
@@ -230,7 +246,6 @@ void project()
 	pinhole_cam.set_image_height(img_height);
 
 	pinhole_cam.set_camera_pose(viewer_pose);
-	std::cout << "Projecting with camera pose: " << viewer_pose << std::endl;
 
 	pinhole_cam.set_input_cloud(cloud);
 
@@ -264,30 +279,20 @@ void drawPoints(cv::Mat& img_out, const std::vector<cv::Point>& pts)
 }
 
 
-void print_help()
+void print_pcl_help()
 {
 	printf(
-"\n===================HELP===================\n"
+"\n===================PCL HELP===================\n"
 "## Commands \n"
 "### PCL Viewer\n"
-"- Annotate: `a` (annotate points in a polygon - currently assigns a random, unique annotation color to the points)\n"
-"- Merge Annotation: `m` (annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action)\n"
-"- Undo-Annotation: `u`  (converts points in the polygon back to their original colors)\n"
-"- Delete: `d`   (removes all points in the polygon)\n"
-"- Extract: `x`  (extracts all points in the polygon -> opposite of 'delete')\n"
+"- OpenCV Pop-up window: `a`\n"
+"- Print current viewer pose: `p`\n"
 "- Undo: `Ctrl + z`\n"
 "- Redo: `Ctrl + y`\n"
 "- Save: `Ctrl + s`  (saves a pcd_file containing the final pointcloud and a json_file containing the annotation colors, respective point indices (relative to original cloud) and point colors. See Usage for setting out_pcd_file and out_json_file argument)\n"
 "- Quit: `Esc`  (quits the program)\n"
-"\n"
-"### OpenCV pop-up window\n"
-"- Draw a polygon point: `Left-click`\n"
-"- Undo previous polygon point: `backspace`\n"
-"- Clear: `c` (clears all existing polygon points)\n"
-"- Quit: `q`  (closes the pop-up window (but not the PCL viewer))\n"
 "===================  ===================\n\n"
 );
-
 }
 
 static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewer, Eigen::Matrix4f& view_pose)
@@ -310,184 +315,6 @@ static inline void get_viewer_pose(pcl::visualization::PCLVisualizer::Ptr& viewe
 	// viewer_pose(0,0) = -viewer_pose(0,0);  // z axis is flipped
 	// viewer_pose(1,1) = -viewer_pose(1,1);  // z axis is flipped
 	// // viewer_pose(2,2) = -viewer_pose(2,2);  // z axis is flipped
-}
-
-void PolygonCallbackFunc(int event, int x, int y, int flags, void* userdata)
-{
-	if  ( event == cv::EVENT_LBUTTONDOWN )
-	{
-		// cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-		cv::Point pt {x,y};
-		img_pts.push_back(pt);
-		proj_img_copy = proj_img.clone();
-		drawPoints(proj_img_copy, img_pts);
-	}
-	else if  ( event == cv::EVENT_RBUTTONDOWN )
-	{
-		cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	}
-	else if  ( event == cv::EVENT_MBUTTONDOWN )
-	{
-		cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	}
-	 else if  ( event == 'x' )
-	{
-		cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-	}
-	cv::imshow("My Window", proj_img_copy);
-}
-
-void SinglePointCallbackFunc(int event, int x, int y, int flags, void* userdata)
-{
-	if  ( event == cv::EVENT_LBUTTONDOWN )
-	{
-		// cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-
-		cv::Rect anchor_rect;
-		cv::Point anchor_pt {x,y};
-		pt_to_rect(anchor_pt, anchor_rect, 5, 5);
-
-		size_t total_colors = saved_colors.size();
-		std::vector<int> saved_colors_count(total_colors);
-		// printf("Anchor Rect: %d %d %d %d\n", anchor_rect.x, anchor_rect.y, anchor_rect.x + anchor_rect.width, anchor_rect.y + anchor_rect.height);
-		for (int x = anchor_rect.x; x < anchor_rect.x + anchor_rect.width; ++x)
-		{	
-			for (int y = anchor_rect.y; y < anchor_rect.y + anchor_rect.height; ++y)
-			{
-				const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
-				for (int c = 0; c < total_colors; ++c)
-				{
-					const auto& s_color = saved_colors[c];
-					if (px[0] == s_color[0] && px[1] == s_color[1] && px[2] == s_color[2])
-					{
-						saved_colors_count[c] += 1;
-						break;
-					}
-				}
-			}
-		}
-
-		// check if color matches a saved color
-		int max_cnt = 0;
-		int max_color_idx = 0;
-		for (int i = 0; i < total_colors; ++i)
-		{
-			int cnt = saved_colors_count[i];
-			if (cnt > max_cnt)
-			{
-				max_cnt = cnt;
-				max_color_idx = i;
-			}
-		}
-		if (max_cnt == 0)
-		{
-			printf("No matching color detected, please select a valid anchor point!\n");
-			return;
-		}
-
-		anchor_color = saved_colors[max_color_idx];
-		printf("Selected anchor color: %d %d %d\n", anchor_color[0], anchor_color[1], anchor_color[2]);
-
-		proj_img_copy = proj_img.clone();
-		float radius = 3;
-		cv::circle( proj_img_copy, {x,y}, radius, BLUE, 3, 8, 0 );
-		
-		// // draw
-		// cv::Mat mask = cv::Mat::zeros(proj_img.size(), CV_8UC1);		
-		// for (int x = 0; x < proj_img.cols; ++x)
-		// {
-		// 	for (int y = 0; y < proj_img.rows; ++y)
-		// 	{
-		// 		const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
-		// 		if (px[0] == anchor_color[0] && px[1] == anchor_color[1] && px[2] == anchor_color[2])
-		// 		{
-		// 			mask.at<uchar>(y,x) = 255;
-		// 		}
-		// 	}
-		// }
-//       std::vector<cv::Vec4i> hierarchy;
-//       std::vector<std::vector<cv::Point>> out_contours;
-//       cv::findContours(mask, out_contours, hierarchy, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-//       cv::drawContours(proj_img_copy, out_contours, -1, cv::Scalar(255, 0, 0), 2, 8);
-	}
-}
-
-void trigger_cv_window()
-{
-	// cv::flip(proj_img, proj_img, -1); // rotate by 180
-
-	//Create a window
-	cv::namedWindow("My Window", 1);
-
-	//set the callback function for any mouse event
-	cv::setMouseCallback("My Window", PolygonCallbackFunc, NULL);
-
-	//show the image
-	while (1)
-	{
-		// SEE https://progtpoint.blogspot.com/2017/06/key-board-ascii-key-code.html
-
-		cv::imshow("My Window", proj_img_copy);
-
-		char key = (char) cv::waitKey(10); 
-		
-		if (key == 'c') // backspace
-		{
-			cout << "C PRESSED\n";
-			img_pts.clear();
-			proj_img_copy = proj_img.clone();
-			drawPoints(proj_img_copy, img_pts);
-		}
-		else if (key == 8) // backspace
-		{
-			cout << "BACKSPACE PRESSED\n";
-			if (img_pts.size() == 0)
-				continue;
-			img_pts.pop_back();
-			// show again
-			proj_img_copy = proj_img.clone();
-			drawPoints(proj_img_copy, img_pts);
-		}
-		else if (key == 13) // enter
-		{
-			cout << "ENTER PRESSED\n";
-			break;
-		}
-		else if (key == 'q')
-		{
-			break;
-		}
-	}
-
-	// cv::destroyWindow("My Window");
-}
-
-
-void trigger_cv_window_merge()
-{
-	//Create a window
-	cv::namedWindow("My Window", 1);
-
-	//set the callback function for any mouse event
-	cv::setMouseCallback("My Window", SinglePointCallbackFunc, NULL);
-	while (1)
-	{
-		cv::imshow("My Window", proj_img_copy);
-
-		char key = (char) cv::waitKey(10); 
-		if (key == 'q')
-		{
-		  cv::destroyWindow("My Window");
-		  return;
-		}
-		if (anchor_color[0] != -1 && anchor_color[1] != -1 && anchor_color[2] != -1)
-		{
-			proj_img = proj_img_copy;
-			break;
-		}
-	}
-
-	trigger_cv_window();
 }
 
 
@@ -591,9 +418,377 @@ inline void to_lower_case(std::string& s)
 	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
 }
 
+void refresh_cloud_func(bool save=true, bool im_project=true)
+{
+	viewer->removeAllPointClouds();
+	viewer->addPointCloud(cloud);
+
+	if (im_project)
+	{
+		project();
+		cv::imshow("My Window", proj_img);
+		cv::waitKey(10);
+	}
+
+	if (save)
+	{
+		std::future<bool> fut = std::async (std::launch::async, save_data); // auto save
+		std::future_status fut_status; 
+
+		// save_data(); // auto save
+		do {
+			viewer->spinOnce(10);
+			fut_status = fut.wait_for(std::chrono::milliseconds(20));
+			// printf("FUT wait %d\n", fut_status);
+		} while (fut_status != std::future_status::ready);
+		fut.get();
+	} else {
+		viewer->spinOnce(10);
+	}
+}
+
+
+
+void process(std::string key, bool is_ctrl=false)
+{
+	cv::Mat mask = get_mask();
+	std::vector<int> cloud_indices;
+	get_mask_3d_points(mask, cloud_indices);
+	if (cloud_indices.size() == 0)
+	{
+		img_pts.clear();
+		return;
+	}
+
+	// add current cloud to undo stack
+	add_current_cloud_to_stack();
+
+	if (key == "a" || key == "m")
+	{
+		Eigen::Vector3i color;
+		if (key == "a")
+		{
+			color = generate_random_color();
+			printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
+			saved_colors.push_back(color);
+		} else {
+			color = anchor_color;
+			anchor_color = {-1,-1,-1}; // reset
+		}
+
+		bool override_annots = !is_ctrl;
+		int colored_cnt = color_cloud_points(*cloud, cloud_indices, color, override_annots); // if control is pressed, don't override previous annotations
+		printf("Annotated %d points with color: %d %d %d\n", colored_cnt, color[0], color[1], color[2]);
+	} else {
+		auto& pts = cloud->points;
+		if (key == "d")
+		{
+			std::vector<int> remain_indices;
+			get_outliers(remain_indices, cloud_indices, cloud->size());
+			std::vector<int> child_indices;
+			extractParentIndices(child_indices, current_indices, remain_indices);
+			current_indices = child_indices;
+			cloud = extract_cloud(cloud, cloud_indices, true);
+			printf("Deleted %d points\n", cloud_indices.size());
+		} else if (key == "x")
+		{
+			std::vector<int> child_indices;
+			extractParentIndices(child_indices, current_indices, cloud_indices);
+			current_indices = child_indices;
+			cloud = extract_cloud(cloud, cloud_indices, false);
+			printf("Extracted %d points\n", cloud_indices.size());
+		} else if (key == "u")
+		{
+			for (int i = 0; i < cloud_indices.size(); ++i)
+			{
+				int ix = cloud_indices[i];
+				int parent_ix = current_indices[ix];
+				cloud->points[ix] = raw_cloud->points[parent_ix];
+				// point_color_map.erase(ix);
+			}
+			printf("Undo annotation for %d points\n", cloud_indices.size());
+		}
+	}
+	img_pts.clear();
+
+	refresh_cloud_func(true, true);
+}
+
+bool get_anchor_color(const cv::Point& anchor_pt)
+{
+	cv::Rect anchor_rect;
+	pt_to_rect(anchor_pt, anchor_rect, 5, 5);
+
+	size_t total_colors = saved_colors.size();
+	std::vector<int> saved_colors_count(total_colors);
+	// printf("Anchor Rect: %d %d %d %d\n", anchor_rect.x, anchor_rect.y, anchor_rect.x + anchor_rect.width, anchor_rect.y + anchor_rect.height);
+	for (int x = anchor_rect.x; x < anchor_rect.x + anchor_rect.width; ++x)
+	{	
+		for (int y = anchor_rect.y; y < anchor_rect.y + anchor_rect.height; ++y)
+		{
+			const auto& px = proj_img_copy.at<cv::Vec3b>(y,x);
+			for (int c = 0; c < total_colors; ++c)
+			{
+				const auto& s_color = saved_colors[c];
+				if (px[0] == s_color[0] && px[1] == s_color[1] && px[2] == s_color[2])
+				{
+					saved_colors_count[c] += 1;
+					break;
+				}
+			}
+		}
+	}
+
+	// check if color matches a saved color
+	int max_cnt = 0;
+	int max_color_idx = 0;
+	for (int i = 0; i < total_colors; ++i)
+	{
+		int cnt = saved_colors_count[i];
+		if (cnt > max_cnt)
+		{
+			max_cnt = cnt;
+			max_color_idx = i;
+		}
+	}
+	if (max_cnt == 0)
+	{
+		printf("No matching color detected, please select a valid anchor point!\n");
+		return false;
+	}
+
+	anchor_color = saved_colors[max_color_idx];
+	printf("Selected anchor color: %d %d %d\n", anchor_color[0], anchor_color[1], anchor_color[2]);
+
+	proj_img_copy = proj_img.clone();
+	float radius = 3;
+	cv::circle( proj_img_copy, anchor_pt, radius, BLUE, 3, 8, 0 );
+
+	return true;
+}
+
+void print_opencv_help()
+{
+	printf(
+		"\n===================OPENCV WINDOW HELP===================\n"
+		"### COMMANDS\n"
+		"- Draw a polygon point: `Left-click`\n"
+		"- Undo previous polygon point: `backspace`\n"
+		"- Clear: `c` (clears all existing polygon points)\n"
+		"- Perform action: `ENTER`\n"
+		"- Quit: `q`  (closes the pop-up window (but not the PCL viewer))\n"
+		"### ACTIONS\n"
+		"- Annotate: annotate points in a polygon - currently assigns a random, unique annotation color to the points\n"
+		"- Ctrl Annotate:  same as above, but does not override existing annotations inside the polygon\n"
+		"- Merge: annotate points in a polygon - this time the annotation color is defined by a selected color, obtained from 'Annotate' action\n"
+		"- Ctrl Merge:  same as above, but does not override existing annotations inside the polygon\n"
+		"- Undo-Annotation:  converts points in the polygon back to their original colors\n"
+		"- Delete:   removes all points in the polygon\n"
+		"- Extract:  extracts all points in the polygon -> opposite of 'delete'\n"
+		"\n===================OPENCV WINDOW HELP===================\n"
+	);
+}
+
+void trigger_cv_window()
+{
+	if (cv_window_cnt == 0)
+	{
+		print_opencv_help();
+	}
+	++cv_window_cnt;
+
+	// cv::flip(proj_img, proj_img, -1); // rotate by 180
+	project();
+	//Create a window
+	cv::namedWindow("My Window", 1);
+
+    cvui::init("My Window");
+
+    ArrayXb modes = ArrayXb::Constant(6,false);
+
+    bool& ANNOTATE = modes(0);
+    bool& DELETE = modes(1);
+    bool& MERGE = modes(2);
+    bool& UNDO = modes(3);
+    bool& CTRL_ANNOTATE = modes(4);
+    bool& CTRL_MERGE = modes(5);
+
+    ANNOTATE = true;
+
+    cv::Rect mode_window_rect {10,50,240,240};
+
+	//show the image
+	while (1)
+	{
+		// SEE https://progtpoint.blogspot.com/2017/06/key-board-ascii-key-code.html
+        bool a_mode = ANNOTATE;
+        bool d_mode = DELETE;
+        bool m_mode = MERGE;
+        bool u_mode = UNDO;
+        bool ca_mode = CTRL_ANNOTATE;
+        bool cm_mode = CTRL_MERGE;
+
+
+        bool undo_flag = false, redo_flag = false;
+
+        cvui::window(proj_img_copy, mode_window_rect.x, mode_window_rect.y, mode_window_rect.width, mode_window_rect.height, "Action");
+        cvui::checkbox(proj_img_copy, 15, 80, "Annotate", &a_mode);
+        cvui::checkbox(proj_img_copy, 100, 80, "Ctrl Annotate", &ca_mode);
+        cvui::checkbox(proj_img_copy, 15, 160, "Merge", &m_mode);
+        cvui::checkbox(proj_img_copy, 100, 160, "Ctrl Merge", &cm_mode);
+        cvui::checkbox(proj_img_copy, 15, 120, "Delete", &d_mode);
+        cvui::checkbox(proj_img_copy, 15, 180, "UndoAnnotation", &u_mode);
+
+        // cvui::printf(proj_img_copy, 15, 200, 0.4, 0x000000, "Revert");
+        cvui::checkbox(proj_img_copy, 15, 220, "Undo", &undo_flag);
+        cvui::checkbox(proj_img_copy, 80, 220, "Redo", &redo_flag);
+
+        cvui::printf(proj_img_copy, 15, 240, 0.4, 0xff0000, "Undo size: %d, Redo size: %d", undo_data.size(), redo_data.size());
+        cvui::printf(proj_img_copy, 15, 260, 0.4, 0xff0000, "Annotation colors: %d", saved_colors.size());
+
+		cv::imshow("My Window", proj_img_copy);
+        cvui::update();
+
+        if (undo_flag)
+        {
+            printf("UNDO!\n");
+            if (undo_data.size() > 0)
+            {
+				undo();
+				refresh_cloud_func(false);
+            }
+            continue;
+        } else if (redo_flag)
+        {
+            printf("REDO!\n");
+            if (redo_data.size() > 0)
+            {
+				redo();
+				refresh_cloud_func(false);
+            }
+            continue;
+        } else if (a_mode && !ANNOTATE)
+        {
+            modes = ArrayXb::Constant(6,false);
+            ANNOTATE = true;
+            continue;
+        }
+        else if (d_mode && !DELETE)
+        {
+            modes = ArrayXb::Constant(6,false);
+            DELETE = true;
+            continue;
+        }
+        else if (m_mode && !MERGE)
+        {
+            modes = ArrayXb::Constant(6,false);
+            MERGE = true;
+            continue;
+        }
+        else if (u_mode && !UNDO)
+        {
+            modes = ArrayXb::Constant(6,false);
+            UNDO = true;
+            continue;
+        }
+        else if (ca_mode && !CTRL_ANNOTATE)
+        {
+            modes = ArrayXb::Constant(6,false);
+            CTRL_ANNOTATE = true;
+            continue;
+        }
+        else if (cm_mode && !CTRL_MERGE)
+        {
+            modes = ArrayXb::Constant(6,false);
+            CTRL_MERGE = true;
+            continue;
+        }
+
+		char key = (char) cv::waitKey(10);
+
+        if (cvui::mouse(cvui::CLICK)) 
+        {
+            // Position the rectangle at the mouse pointer.
+            cv::Point pt;
+            pt.x = cvui::mouse().x;
+            pt.y = cvui::mouse().y;
+
+            if (!(pt.x > mode_window_rect.x && pt.x < mode_window_rect.x + mode_window_rect.width &&
+            	pt.y > mode_window_rect.y && pt.y < mode_window_rect.y + mode_window_rect.height))
+            {
+            	if ((MERGE || CTRL_MERGE) && (anchor_color[0] == -1 || anchor_color[1] == -1 || anchor_color[2] == -1))
+            	{
+            		bool rt = get_anchor_color(pt);
+            		if (rt)
+            		{
+            			proj_img = proj_img_copy;
+            		}
+            	} else {
+		    		img_pts.push_back(pt);
+		    		proj_img_copy = proj_img.clone();
+					drawPoints(proj_img_copy, img_pts);
+            	}
+            }
+        }
+		
+		if (key == 'h')
+		{
+			print_opencv_help();
+			continue;
+		}
+		else if (key == 'c') // backspace
+		{
+			cout << "C PRESSED\n";
+			img_pts.clear();
+			proj_img_copy = proj_img.clone();
+			drawPoints(proj_img_copy, img_pts);
+		}
+		else if (key == 8) // backspace
+		{
+			cout << "BACKSPACE PRESSED\n";
+			if (img_pts.size() == 0)
+				continue;
+			img_pts.pop_back();
+			// show again
+			proj_img_copy = proj_img.clone();
+			drawPoints(proj_img_copy, img_pts);
+		}
+		else if (key == 13 || key == 10) // enter
+		{
+			cout << "ENTER PRESSED\n";
+			std::string key = "a";
+			bool is_ctrl = false;
+			if (DELETE)
+				key = "d";
+			else if (MERGE)
+				key = "m";
+			else if (UNDO)
+				key = "u";
+			else if (CTRL_ANNOTATE)
+			{
+				is_ctrl = true;
+				key = "a";
+			}
+			else if (CTRL_MERGE)
+			{
+				is_ctrl = true;
+				key = "m";
+			}
+			process(key, is_ctrl);
+		}
+		else if (key == 'q')
+		{
+			img_pts.clear();
+			cv::destroyWindow("My Window");
+			break;
+		}
+	}
+
+}
+
 void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer_void)
 {
-	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
+	// boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
 
 	std::string key = event.getKeySym();
 	to_lower_case(key);
@@ -603,121 +798,27 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 	{
 		if (key == "h")
 		{
-			print_help();
+			print_pcl_help();
 			return;
 		}
 
 		get_viewer_pose(viewer, viewer_pose);
 
-		bool is_ctrl = event.isCtrlPressed();
-		if (key == "a" || key == "u" || key == "d" || key == "x" || key == "m")
+		if (key == "p")
 		{
-			printf("[Ctrl] pressed\n");
-			if (key == "a")
-			{
-				printf("Operation: ANNOTATE\n");
-			} else if (key == "u")
-			{
-				printf("Operation: UNDO ANNOTATION\n");
-				if (saved_colors.size() == 0)
-				{
-					printf("There are currently no valid annotation colors\n");	
-					return;	
-				} 
-			} else if (key == "d")
-			{
-				printf("Operation: DELETE\n");
-			} else if (key == "x")
-			{
-				printf("Operation: EXTRACT\n");
-			} else if (key == "m")
-			{
-				printf("Operation: MERGE\n");
-				if (saved_colors.size() == 0)
-				{
-					printf("There are currently no valid annotation colors\n");	
-					return;
-				}
-			} 
+			std::cout << "Showing viewer pose...\n";
+			std::cout << viewer_pose << std::endl;
+			return;
+		}
 
-			project();
-
-			if (key == "m")
-			{
-				printf("Select an anchor point, then draw an extra polygon \n");
-				trigger_cv_window_merge();
-			} else {
-				trigger_cv_window();			
-			}
-
-			cv::Mat mask = get_mask();
-			std::vector<int> cloud_indices;
-			get_mask_3d_points(mask, cloud_indices);
-			if (cloud_indices.size() == 0)
-			{
-				img_pts.clear();
-				return;
-			}
-
-			// add current cloud to undo stack
-			add_current_cloud_to_stack();
-
-			if (key == "a" || key == "m")
-			{
-				Eigen::Vector3i color;
-				if (key == "a")
-				{
-					color = generate_random_color();
-					printf("Added new annotation color: %d %d %d\n", color[0], color[1], color[2]);
-					saved_colors.push_back(color);
-				} else {
-					color = anchor_color;
-					anchor_color = {-1,-1,-1}; // reset
-				}
-
-				bool override_annots = !is_ctrl;
-				int colored_cnt = color_cloud_points(*cloud, cloud_indices, color, override_annots); // if control is pressed, don't override previous annotations
-				printf("Annotated %d points with color: %d %d %d\n", colored_cnt, color[0], color[1], color[2]);
-			} else {
-				auto& pts = cloud->points;
-				if (key == "d")
-				{
-					std::vector<int> remain_indices;
-					get_outliers(remain_indices, cloud_indices, cloud->size());
-					std::vector<int> child_indices;
-					extractParentIndices(child_indices, current_indices, remain_indices);
-					current_indices = child_indices;
-					cloud = extract_cloud(cloud, cloud_indices, true);
-					printf("Deleted %d points\n", cloud_indices.size());
-				} else if (key == "x")
-				{
-					std::vector<int> child_indices;
-					extractParentIndices(child_indices, current_indices, cloud_indices);
-					current_indices = child_indices;
-					cloud = extract_cloud(cloud, cloud_indices, false);
-					printf("Extracted %d points\n", cloud_indices.size());
-				} else if (key == "u")
-				{
-					for (int i = 0; i < cloud_indices.size(); ++i)
-					{
-						int ix = cloud_indices[i];
-						int parent_ix = current_indices[ix];
-						cloud->points[ix] = raw_cloud->points[parent_ix];
-						// point_color_map.erase(ix);
-					}
-					printf("Undo annotation for %d points\n", cloud_indices.size());
-				}
-				// std::sort(cloud_indices.begin(), cloud_indices.end()); // sort so that erase can be ordered
-				// for (int i = 0; i < cloud_indices.size(); ++i)
-				// {
-				// 	int idx = cloud_indices[i] - i;
-				// 	pts.erase(pts.begin() + idx);
-				// }
-			}
-			img_pts.clear();
-
-			refresh_cloud = true;
-
+		bool is_ctrl = event.isCtrlPressed();
+		if (key == "a")
+		{
+			// project();
+			trigger_cv_window();			
+			// refresh_cloud_func();
+			viewer->spin();
+			// refresh_cloud = true;
 		} 
 		if (is_ctrl)
 		{
@@ -739,36 +840,27 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 			}
 			else if (key == "z")
 			{
-				printf("Ctrl+z PRESSED\n");		
-				undo();
-				refresh_cloud = true;
+				printf("UNDO\n");		
+				if (undo_data.size() > 0)
+				{
+					undo();
+					refresh_cloud = true;
+				}
 			}
 			else if (key == "y")
 			{
-				printf("Ctrl+y PRESSED\n");		
-				redo();
-				refresh_cloud = true;
+				printf("REDO\n");
+				if (redo_data.size() > 0)
+				{
+					redo();
+					refresh_cloud = true;
+				}
 			}
 		}
 
 		if (refresh_cloud)	
 		{
-			std::future<bool> fut = std::async (std::launch::async, save_data); // auto save
-			std::future_status fut_status; 
-
-			viewer->removeAllPointClouds();
-			viewer->addPointCloud(cloud);
-			// save_data(); // auto save
-
-			project();
-			cv::imshow("My Window", proj_img);
-			cv::waitKey(10);
-			do {
-				viewer->spinOnce(20);
-				fut_status = fut.wait_for(std::chrono::milliseconds(20));
-				// printf("FUT wait %d\n", fut_status);
-			} while (fut_status != std::future_status::ready);
-			fut.get();
+			refresh_cloud_func(true, false);
 			viewer->spin();
 		}
 	}
@@ -776,7 +868,7 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void*
 
 void mouseEventOccurred(const pcl::visualization::MouseEvent &event, void* viewer_void)
 {
-	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
+	// boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
 
 	if (event.getButton() == pcl::visualization::MouseEvent::LeftButton &&
 	  event.getType() == pcl::visualization::MouseEvent::MouseButtonRelease)
@@ -847,7 +939,7 @@ int main(int argc, char *argv[])
 		std::cout << "Cloud reading failed." << std::endl;
 		return (-1);
 	}
-	print_help();
+	print_pcl_help();
 
 	pcl::console::parse (argc, argv, "-ores", octree_resolution);
 	pcl::console::parse (argc, argv, "-width", img_width);
@@ -870,7 +962,7 @@ int main(int argc, char *argv[])
 
 
 	PCLInteractorCustom* style = PCLInteractorCustom::New(); 
-	pcl::visualization::PCLVisualizer::Ptr viewer(new PCLVisCustom(argc, argv, style));
+	viewer = pcl::visualization::PCLVisualizer::Ptr(new PCLVisCustom(argc, argv, style));
 	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
 	viewer->registerMouseCallback(mouseEventOccurred, (void*)&viewer);
 	viewer->addCoordinateSystem();

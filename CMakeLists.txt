@@ -17,26 +17,17 @@ add_definitions(${PCL_DEFINITIONS})
 include_directories(include)
 include_directories(include/utils)
 
-#add_executable (read_sm_file ../test/read_sm_file.cpp)
-#target_link_libraries (read_sm_file ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
 add_executable (pinhole_test ../test/pinhole_test.cpp)
 target_link_libraries (pinhole_test ${PCL_LIBRARIES} ${OpenCV_LIBS})
-
-#add_executable (label_3d_cloud_seg ../test/label_3d_cloud_seg.cpp ../src/plane_segmenter.cc ../src/segmenter_params.cc)
-#target_link_libraries (label_3d_cloud_seg ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
 add_executable (labelme_3d ../test/labelme_3d.cpp ../src/pcl_viewer_custom.cc ../src/labelme_io.cc)
 target_link_libraries (labelme_3d ${PCL_LIBRARIES} ${OpenCV_LIBS} "-lpthread")
 
-add_executable (pcl_viewer_test ../test/pcl_viewer_test.cpp ../src/pcl_viewer_custom.cc)
-target_link_libraries (pcl_viewer_test ${PCL_LIBRARIES})
-
 add_executable (read_labelme_data ../test/read_labelme_data.cpp ../src/labelme_io.cc)
 target_link_libraries (read_labelme_data ${PCL_LIBRARIES} ${OpenCV_LIBS})
 
-add_executable (cvui_test ../test/cvui_test.cpp)
-target_link_libraries (cvui_test ${OpenCV_LIBS})
+#add_executable (cvui_test ../test/cvui_test.cpp)
+#target_link_libraries (cvui_test ${OpenCV_LIBS})
 
-add_executable (labelme_3d2 ../test/labelme_3d2.cpp ../src/pcl_viewer_custom.cc ../src/labelme_io.cc)
-target_link_libraries (labelme_3d2 ${PCL_LIBRARIES} ${OpenCV_LIBS} "-lpthread")
+#add_executable (pcl_viewer_test ../test/pcl_viewer_test.cpp ../src/pcl_viewer_custom.cc)
+#target_link_libraries (pcl_viewer_test ${PCL_LIBRARIES})
