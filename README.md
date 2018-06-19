@@ -5,6 +5,10 @@ Labelling pointclouds is now as simple as opening up PCL viewer and pressing som
 
 Annotate, delete, and extract points in a cloud by drawing polygons (to form a mask around the desired points)
 
+![](samples/sample.png) 
+![](samples/sample_colored.png)
+
+
 ## About
 This tool is comprised of 2 components:
 - __PCL Viewer__
