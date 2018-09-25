@@ -46,7 +46,8 @@ float octree_resolution = 0.02f;
 
 int img_width = 960;
 int img_height = 960;
-int focal = 800;
+int fx = 800;
+int fy = fx;
 
 pcl::visualization::PCLVisualizer::Ptr viewer;
 
@@ -241,7 +242,7 @@ void project()
 	float cx = 0.5 * img_width;
 	float cy = 0.5 * img_height;
 
-	PinholeCamera<PointT> pinhole_cam(focal, cx, cy);
+	PinholeCamera<PointT> pinhole_cam(fx, fy, cx, cy);
 	pinhole_cam.set_image_width(img_width);
 	pinhole_cam.set_image_height(img_height);
 
@@ -955,7 +956,8 @@ int main(int argc, char *argv[])
 	pcl::console::parse (argc, argv, "-ores", octree_resolution);
 	pcl::console::parse (argc, argv, "-width", img_width);
 	pcl::console::parse (argc, argv, "-height", img_height);
-	pcl::console::parse (argc, argv, "-focal", focal);
+	pcl::console::parse (argc, argv, "-fx", fx);
+	pcl::console::parse (argc, argv, "-fy", fy);
 	pcl::console::parse (argc, argv, "-s", out_pcd_file);
 	pcl::console::parse (argc, argv, "-ij", in_json_file);
 	pcl::console::parse (argc, argv, "-oj", out_json_file);

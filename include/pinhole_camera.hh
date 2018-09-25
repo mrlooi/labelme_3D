@@ -10,10 +10,10 @@
 /* 
 You need first 3 parameters that define your camera: the focal length f, and the center of the projection plane: cx, cy. With this you create a 3x3 matrix (I will use matlab syntax):
 
-A = [ f 0 cx;
-	  0 f cy;
+A = [ fx 0 cx;
+	  0 fy cy;
 	  0 0  1 ];
-You can use something like cx = 0.5 * image_width, cy = 0.5 * image_height, and some value as f = 800 (try some of them to check how the image looks better).
+You can use something like cx = 0.5 * image_width, cy = 0.5 * image_height, and some value as fx/fy = 800 (try some of them to check how the image looks better).
 
 Then, a 3x4 matrix with the transformation from the camera frame to the point cloud frame:
 
@@ -45,10 +45,11 @@ class PinholeCamera
 	typedef typename Octree::Ptr OctreePtr;
 
 public:
-	PinholeCamera(float focal, float cx, float cy, const Eigen::Matrix4f& camera_pose = Eigen::Matrix4f::Identity()):
+	PinholeCamera(float fx, float fy, float cx, float cy, const Eigen::Matrix4f& camera_pose = Eigen::Matrix4f::Identity()):
 		T_(3,4)
 	{
-		f_ = focal;
+		fx_ = fx;
+		fy_ = fy;
 		cx_ = cx;
 		cy_ = cy;
 
@@ -101,9 +102,13 @@ public:
 	}
 
 	// setter methods
-	inline void set_focal(float focal)
+	inline void set_fx(float fx)
 	{	
-		f_ = focal;
+		fx_ = fx;
+	}
+	inline void set_fy(float fy)
+	{	
+		fy_ = fy;
 	}
 	inline void set_cx(float cx)
 	{	
@@ -136,9 +141,13 @@ public:
 	}
 
 	// getter methods
-	inline float get_focal() const
+	inline float get_fx() const
 	{
-		return f_;
+		return fx_;
+	}
+	inline float get_fy() const
+	{
+		return fy_;
 	}
 	inline float get_cx() const
 	{
@@ -457,7 +466,7 @@ private:
 
 	inline void compute_A()
 	{
-		A_ << f_, 0, cx_, 0, f_, cy_, 0, 0, 1;
+		A_ << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1;
 	}
 	inline void compute_T()
 	{
@@ -490,7 +499,8 @@ private:
 		return Eigen::Vector3f(pt.x, pt.y, pt.z).squaredNorm();
 	}
 
-	float f_; 
+	float fx_; 
+	float fy_; 
 	float cx_;
 	float cy_;	
 

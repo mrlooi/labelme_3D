@@ -10,6 +10,8 @@
 #include "pinhole_camera.hh"
 #include "labelme_io.hh"
 
+#include "json.hpp"
+
 #define PRINT(a) std::cout << #a << ": " << a << std::endl;
 
 typedef pcl::PointXYZRGBA PointT;
@@ -18,6 +20,14 @@ static inline bool compareContourAreasDesc(const std::vector<cv::Point> &contour
     double i = fabs(contourArea(cv::Mat(contour1)));
     double j = fabs(contourArea(cv::Mat(contour2)));
     return (i > j);
+}
+
+static inline bool replaceStr(std::string& str, const std::string& from, const std::string& to) {
+    size_t start_pos = str.find(from);
+    if(start_pos == std::string::npos)
+        return false;
+    str.replace(start_pos, from.length(), to);
+    return true;
 }
 
 
@@ -35,8 +45,12 @@ int main(int argc, char *argv[])
 
   int morph_kernel_size = 9;
   float octree_resolution = 0.015;
+  std::string poses_json_file = "../data/poses.json";
+
   pcl::console::parse (argc, argv, "-ores", octree_resolution);
   pcl::console::parse (argc, argv, "-morph", morph_kernel_size);
+  pcl::console::parse (argc, argv, "-poses", poses_json_file);
+  bool vis = pcl::console::find_switch (argc, argv, "-vis");
 
   pcl::PointCloud<PointT>::Ptr raw_cloud (new pcl::PointCloud<PointT>);
   pcl::PointCloud<PointT>::Ptr cloud (new pcl::PointCloud<PointT>); // same as annotated cloud, but with original raw cloud colors
@@ -52,31 +66,43 @@ int main(int argc, char *argv[])
   if (!rt)
   {
     std::cout << "Failed to read " << json_file << std::endl;
-    return -1;
+    // return -1;
   }
-  std::string poses_json_file = "../data/poses.json";
+
+  std::string base_file_name = json_file;
+  replaceStr(base_file_name, ".json", "");
+  PRINT(base_file_name)
+
   rt = labelme::read_data(poses_json_file, l_data);
 
-  cloud->resize(l_data.data.size());
-  annotated_cloud->resize(l_data.data.size());
-  for (int i = 0; i < l_data.data.size(); ++i)
+  if (l_data.data.size() == 0)
   {
-    int idx = l_data.data[i][0];
-    assert (idx < raw_cloud->points.size());
-    PointT pt = raw_cloud->points[idx];
-    cloud->points[i] = pt;
-    pt.b = l_data.data[i][1];
-    pt.g = l_data.data[i][2];
-    pt.r = l_data.data[i][3];
-    annotated_cloud->points[i] = pt;
+    *cloud += *raw_cloud;
+  } else {
+    cloud->resize(l_data.data.size());
+    annotated_cloud->resize(l_data.data.size());
+    for (int i = 0; i < l_data.data.size(); ++i)
+    {
+      int idx = l_data.data[i][0];
+      assert (idx < raw_cloud->points.size());
+      PointT pt = raw_cloud->points[idx];
+      cloud->points[i] = pt;
+      pt.b = l_data.data[i][1];
+      pt.g = l_data.data[i][2];
+      pt.r = l_data.data[i][3];
+      annotated_cloud->points[i] = pt;
+    }
   }
 
   PRINT(l_data.colors.size())
 
-  pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud"));
-  viewer->addCoordinateSystem();
-  viewer->addPointCloud(annotated_cloud);
-  viewer->spin();
+  if (vis)
+  {
+    pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("Cloud"));
+    viewer->addCoordinateSystem();
+    viewer->addPointCloud(annotated_cloud);
+    viewer->spin();
+  }
 
   // pcl::transformPointCloud(*cloud, *cloud, viewer_pose);
   // viewer->removeAllPointClouds();
@@ -85,11 +111,12 @@ int main(int argc, char *argv[])
 
   int img_width = 960;
   int img_height = 960;
-  int focal = 800;
+  int fx = 800;
+  int fy = fx;
   float cx = 0.5 * img_width;
   float cy = 0.5 * img_height;
 
-  PinholeCamera<PointT> pinhole_cam(focal, cx, cy);
+  PinholeCamera<PointT> pinhole_cam(fx, fy, cx, cy);
   pinhole_cam.set_image_width(img_width);
   pinhole_cam.set_image_height(img_height);
 
@@ -110,13 +137,25 @@ int main(int argc, char *argv[])
     // pinhole_cam.project(proj_img2, uv_idx_map);
     pinhole_cam.project_non_occluded_surface(proj_img2, uv_idx_map, octree_resolution, octree_resolution * 4);
 
-    cv::imshow("img", proj_img);
-    cv::imshow("img2", proj_img2);
-    cv::waitKey(0);
+    if (vis)
+    {
+      cv::imshow("img", proj_img);
+      cv::imshow("img2", proj_img2);
+      cv::waitKey(0);
+    }
+
+
+    std::string proj_img_file = base_file_name + "__" + std::to_string(v) + ".jpg";
+    std::string proj_img_json_file = base_file_name + "__" + std::to_string(v) + ".json";
+    
+    cv::imwrite(proj_img_file, proj_img);
+    std::cout << "Saved to " << proj_img_file << std::endl;
+
+    std::vector<std::vector<int>> annot_pts(l_data.colors.size());
 
     for (int i = 0; i < l_data.colors.size(); ++i)
     {
-      auto color = l_data.colors[i];
+      const auto& color = l_data.colors[i];
       cv::Mat mask = cv::Mat::zeros(proj_img2.size(), CV_8UC1);   
       for (int x = 0; x < proj_img2.cols; ++x)
       {
@@ -129,6 +168,7 @@ int main(int argc, char *argv[])
           }
         }
       }
+
       cv::imshow("mask", mask);
 
       // close holes arising from sparse points 
@@ -165,17 +205,32 @@ int main(int argc, char *argv[])
         for (const auto& apt: approx_out)
         {
           cv::circle(proj_img, apt, 3, cv::Scalar(0,255,0), 1, 8, 0);
+          annot_pts[i].push_back(apt.x);
+          annot_pts[i].push_back(apt.y);
           // printf("[%d,%d],", apt.x, apt.y);
         }
         // printf("]\n");
       }
 
     }
-    cv::imshow("contours", proj_img);
-    cv::waitKey(0);
-    
-  }
 
+    if (vis)
+    {
+      cv::imshow("contours", proj_img);
+      cv::waitKey(0);
+    }
+
+    std::ofstream file(proj_img_json_file);
+    if (file.is_open()) 
+    {
+      nlohmann::json j;
+      j["data"] = annot_pts;
+      file << j;
+      file.close();
+      std::cout << "Saved to " << proj_img_json_file << std::endl;
+    }
+      
+  }
 
   return 0;
 }
